@@ -1,8 +1,11 @@
 "use strict";
 
 const labels = ["樓層", "房間", "櫃子", "分類箱", "物品"];
+const PAGE_BUILD = 1;
+const PAGE_DATE = "2026-11-18";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
+const updateDialog = $("update-dialog");
 let entries = [];
 let current = null;
 let draft;
@@ -10,6 +13,34 @@ let objectUrls = [];
 let previewUrl;
 let photoVersion = 0;
 let saving = false;
+let pendingUpdate;
+let checkingUpdate = false;
+
+function showUpdatePrompt() {
+  if (!pendingUpdate || editor.open || updateDialog.open) return;
+  const { build, date } = pendingUpdate;
+  $("update-version").textContent = "目前版次 " + PAGE_BUILD + " → 線上版次 " + build +
+    (date ? " (" + date + ")" : "");
+  updateDialog.showModal();
+}
+
+async function checkForUpdate() {
+  if (checkingUpdate || window.location.protocol === "file:") return;
+  checkingUpdate = true;
+  try {
+    const response = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+    if (!response.ok) return;
+    const version = await response.json();
+    if (Number.isSafeInteger(version.build) && version.build > (pendingUpdate?.build ?? PAGE_BUILD)) {
+      pendingUpdate = version;
+      showUpdatePrompt();
+    }
+  } catch {
+    // A failed check leaves the current page available.
+  } finally {
+    checkingUpdate = false;
+  }
+}
 
 const thumbnails = new IntersectionObserver(changes => {
   for (const change of changes) {
@@ -223,6 +254,7 @@ function closeEditor() {
   photoVersion++;
   draft = undefined;
   showPhoto();
+  showUpdatePrompt();
 }
 $("form").onsubmit = async event => {
   event.preventDefault();
@@ -325,6 +357,20 @@ $("login").onclick = async () => {
   }
 };
 $("logout").onclick = () => signOut();
+
+$("page-version").textContent = "版次 " + PAGE_BUILD + " (" + PAGE_DATE + ")";
+updateDialog.oncancel = event => event.preventDefault();
+$("update-reload").onclick = () => {
+  const url = new URL(window.location.href);
+  url.searchParams.set("_v", String(Date.now()));
+  window.location.replace(url.href);
+};
+window.addEventListener("focus", checkForUpdate);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void checkForUpdate();
+});
+setInterval(checkForUpdate, 60000);
+void checkForUpdate();
 
 if (window.location.protocol === "file:") {
   $("login").disabled = true;

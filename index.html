@@ -6,16 +6,16 @@
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>收好收滿</title>
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="app.css">
+  <link rel="icon" href="icon.svg?v=1" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest?v=1">
+  <link rel="stylesheet" href="app.css?v=1">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
-  <script src="drive.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="drive.js?v=1" defer></script>
+  <script src="app.js?v=1" defer></script>
 </head>
 <body>
-  <header class="brand"><img src="icon.svg" alt=""><strong>收好收滿</strong><button id="logout" class="quiet" hidden>登出</button></header>
+  <header class="brand"><img src="icon.svg?v=1" alt=""><div><strong>收好收滿</strong><p id="page-version" class="page-version"></p></div><button id="logout" class="quiet" hidden>登出</button></header>
   <section id="gate" class="gate" aria-labelledby="gate-title">
     <div class="hero">
       <div><h1 id="gate-title">收好收滿</h1><p>登入 Google，查看與管理你的收納清單。</p></div>
@@ -53,6 +53,11 @@
       <p id="form-status" role="status"></p>
       <div class="editor-actions"><button type="button" id="remove" class="danger" hidden>刪除</button><button class="primary" id="save">儲存</button></div>
     </form>
+  </dialog>
+  <dialog id="update-dialog" aria-labelledby="update-title" aria-describedby="update-version">
+    <h2 id="update-title">有新版可以更新</h2>
+    <p id="update-version" class="muted"></p>
+    <div class="editor-actions"><button id="update-reload" class="primary" autofocus>立即更新</button></div>
   </dialog>
 </body>
 </html>

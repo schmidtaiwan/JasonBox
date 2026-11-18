@@ -18,6 +18,8 @@ button:disabled { cursor: wait; opacity: .55; }
 .brand { display: flex; gap: 10px; align-items: center; min-height: 70px; padding-top: env(safe-area-inset-top); font-size: 1.15rem; letter-spacing: .08em; }
 .brand img { width: 36px; height: 36px; }
 .brand button { margin-left: auto; }
+.page-version { margin-top: 2px; font-size: .75rem; letter-spacing: normal; color: var(--muted); }
+#update-version { margin-top: 8px; }
 .gate #login { width: 100%; margin-top: 18px; }
 .gate #login-status { margin-top: 10px; color: var(--muted); }
 main { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }

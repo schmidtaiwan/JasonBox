@@ -1,0 +1,6 @@
+---
+description: JasonBox 版次與 GitHub Pages 發布流程
+alwaysApply: true
+---
+
+完成 JasonBox 網站修改後，依 [專案發布規則](../../AGENTS.md) 更新版次、推送至 GitHub 並確認正式網站上線。

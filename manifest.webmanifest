@@ -1,0 +1,11 @@
+{
+  "id": "./",
+  "name": "收好收滿",
+  "short_name": "收好收滿",
+  "lang": "zh-Hant",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f5ee",
+  "theme_color": "#f7f5ee",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]
+}

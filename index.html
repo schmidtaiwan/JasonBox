@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5ee">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>收好收滿</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="app.css">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="drive.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="brand"><img src="icon.svg" alt=""><strong>收好收滿</strong><button id="logout" class="quiet" hidden>登出</button></header>
+  <section id="gate" class="gate" aria-labelledby="gate-title">
+    <div class="hero">
+      <div><h1 id="gate-title">收好收滿</h1><p>登入 Google，查看與管理你的收納清單。</p></div>
+      <div class="illustration" aria-hidden="true"><i></i><i></i><i></i></div>
+    </div>
+    <button id="login" class="primary">使用 Google 帳號登入</button>
+    <div class="photo-controls">
+      <label class="photo-button">匯入 Google 登入設定<input id="import-config" type="file" accept=".json,application/json"></label>
+    </div>
+    <p id="login-status" role="status"></p>
+  </section>
+  <main hidden>
+    <section class="hero">
+      <div><h1 id="page-title">我的收納</h1><p id="summary"></p></div>
+      <div class="illustration" aria-hidden="true"><i></i><i></i><i></i></div>
+    </section>
+    <label class="search"><span aria-hidden="true">⌕</span><input type="search" id="search" placeholder="搜尋物品或分類箱" aria-label="搜尋物品或分類箱"></label>
+    <nav id="path" aria-label="收納位置"></nav>
+    <section aria-labelledby="list-title">
+      <div class="section-title"><h2 id="list-title"></h2><span id="count"></span></div>
+      <div id="list"></div>
+    </section>
+  </main>
+  <footer hidden><button id="add" class="primary" disabled></button></footer>
+  <dialog id="editor">
+    <form id="form">
+      <div class="section-title"><h2 id="editor-title"></h2><button type="button" id="close" class="quiet" aria-label="關閉">✕</button></div>
+      <p id="location" class="muted"></p>
+      <label class="field">名稱<input id="name" required maxlength="80"></label>
+      <div id="photos" hidden>
+        <img id="preview" alt="物品照片預覽" hidden>
+        <div class="photo-controls">
+          <label class="photo-button">拍照<input id="camera" type="file" accept="image/*" capture="environment"></label>
+          <label class="photo-button">選擇照片<input id="gallery" type="file" accept="image/*"></label>
+          <button type="button" class="quiet" id="remove-photo" hidden>移除照片</button>
+        </div>
+      </div>
+      <p id="form-status" role="status"></p>
+      <div class="editor-actions"><button type="button" id="remove" class="danger" hidden>刪除</button><button class="primary" id="save">儲存</button></div>
+    </form>
+  </dialog>
+</body>
+</html>

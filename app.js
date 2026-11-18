@@ -10,14 +10,6 @@ let objectUrls = [];
 let previewUrl;
 let photoVersion = 0;
 let saving = false;
-const configKey = "JasonBox.googleConfig";
-let googleConfig;
-
-try {
-  googleConfig = JSON.parse(localStorage.getItem(configKey));
-} catch {
-  googleConfig = null;
-}
 
 const thumbnails = new IntersectionObserver(changes => {
   for (const change of changes) {
@@ -313,14 +305,17 @@ function showError(error) {
 }
 
 $("login").onclick = async () => {
-  if (!googleConfig) {
-    $("login-status").textContent = "請先匯入 Google 登入設定檔。";
+  const sharedConfig = window.GOOGLE_CONFIG;
+  const clientId = sharedConfig?.clientId?.trim();
+  const owner = sharedConfig?.preferredEmail?.trim().toLowerCase();
+  if (!clientId || !owner) {
+    $("login-status").textContent = "無法載入 JasonHome 的 Google 登入設定，請重新整理後再試。";
     return;
   }
   $("login").disabled = true;
   $("login-status").textContent = "正在連接 Google Drive…";
   try {
-    await drive.login(googleConfig);
+    await drive.login({ clientId, owner });
     await refresh();
     setSignedIn(true);
   } catch (error) {
@@ -330,26 +325,6 @@ $("login").onclick = async () => {
   }
 };
 $("logout").onclick = () => signOut();
-
-$("import-config").onchange = async event => {
-  const file = event.target.files[0];
-  event.target.value = "";
-  if (!file || $("login").disabled) return;
-  try {
-    const config = JSON.parse(await file.text());
-    if (typeof config.clientId !== "string" || typeof config.owner !== "string" ||
-        !/^\d+-[\w-]+\.apps\.googleusercontent\.com$/.test(config.clientId) ||
-        !/^[^\s@]+@gmail\.com$/i.test(config.owner)) {
-      throw new Error("設定格式不符");
-    }
-    const next = { clientId: config.clientId, owner: config.owner.toLowerCase() };
-    localStorage.setItem(configKey, JSON.stringify(next));
-    googleConfig = next;
-    $("login-status").textContent = "設定已儲存在此瀏覽器，可以登入 Google。";
-  } catch {
-    $("login-status").textContent = "無法匯入設定。請選擇 JasonBox 的 JSON 設定檔，並確認瀏覽器允許儲存設定。";
-  }
-};
 
 if (window.location.protocol === "file:") {
   $("login").disabled = true;

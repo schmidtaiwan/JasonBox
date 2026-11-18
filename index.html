@@ -10,6 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="app.css">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
   <script src="drive.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -21,9 +22,6 @@
       <div class="illustration" aria-hidden="true"><i></i><i></i><i></i></div>
     </div>
     <button id="login" class="primary">使用 Google 帳號登入</button>
-    <div class="photo-controls">
-      <label class="photo-button">匯入 Google 登入設定<input id="import-config" type="file" accept=".json,application/json"></label>
-    </div>
     <p id="login-status" role="status"></p>
   </section>
   <main hidden>

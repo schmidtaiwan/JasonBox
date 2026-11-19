@@ -155,6 +155,11 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await new Promise(resolve => setImmediate(resolve));
   context.drive.save = realSave;
   assert.equal(run('photoUploads.size'), 0, 'retry replaces local photo with uploaded record');
+  run('queueSelectedPhotos({level:4,parent:current.id,name:"批次照片",photos:[{name:"照片A",photo:new Blob(["a"])},{name:"照片B",photo:new Blob(["b"])}]}, "")');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(records.filter(r => ["照片A", "照片B"].includes(r.name) && r.parent === storage.id).length, 2, 'multiple photos go into the same cabinet');
+  assert.equal(run('photoUploads.size'), 0);
+
   assert.ok(records.some(r => r.name.startsWith('物品照片 ') && r.parent === storage.id), 'photo-only item gets a readable automatic name');
   assert.equal(run('formatTime("2026-11-19T04:00:00Z")').includes('12:00:00'), true);
   run('navigate(entries.find(e => e.name === "床底下"))');

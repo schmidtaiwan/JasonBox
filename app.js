@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 18;
+const PAGE_BUILD = 19;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -142,6 +142,16 @@ function displayThumbnail(placeholder, entry) {
   } else if (entry.hasPhoto) {
     placeholder.dataset.id = entry.id;
     thumbnails.observe(placeholder);
+  }
+}
+
+function queueSelectedPhotos(record, name) {
+  const photos = record.photos || [{ photo: record.photo }];
+  for (const [index, item] of photos.entries()) {
+    const { photos: unused, ...single } = record;
+    single.photo = item.photo;
+    single.name = photos.length === 1 ? record.name : name ? name + " " + (index + 1) : item.name || record.name + " " + (index + 1);
+    queuePhotoUpload(single);
   }
 }
 
@@ -292,6 +302,8 @@ function edit(entry, placement) {
   $("position-type-field").hidden = !isPosition;
   const label = draft.level === 4 ? "物品" : isPosition ? "內部位置" : "存放空間";
   $("form").reset();
+  $("gallery").multiple = !draft.id;
+  $("batch-preview").replaceChildren();
   $("position-type").value = draft.positionType || "區";
   $("form-status").textContent = "";
   $("editor-title").textContent = (entry ? "編輯" : "新增") + label;
@@ -347,18 +359,31 @@ async function compress(file) {
 }
 
 async function pickPhoto(event) {
-  const file = event.target.files[0];
+  const files = Array.from(event.target.files);
+  const file = files[0];
   event.target.value = "";
   if (!file) return;
   const version = ++photoVersion;
   busy(true);
   $("form-status").textContent = "正在處理照片…";
   try {
-    const photo = await compress(file);
-    if (version !== photoVersion) return;
-    draft.photo = photo;
+    const photos = [];
+    for (const selected of (draft.id ? files.slice(0, 1) : files)) {
+      photos.push({ photo: await compress(selected), name: selected.name.replace(/\.[^.]+$/, "") });
+      if (version !== photoVersion) return;
+    }
+    draft.photo = photos[0].photo;
+    draft.photos = photos;
+    draft.photoRemoved = false;
     showPhoto();
-    $("form-status").textContent = "";
+    $("batch-preview").replaceChildren(...photos.slice(1).map(item => {
+      const image = element("img", "", "thumb");
+      image.alt = item.name;
+      image.src = URL.createObjectURL(item.photo);
+      objectUrls.push(image.src);
+      return image;
+    }));
+    $("form-status").textContent = photos.length > 1 ? "已選擇 " + photos.length + " 張照片，每張將新增為一筆物品。" : "";
   } catch {
     if (version === photoVersion) $("form-status").textContent = "無法讀取這張照片，請試用 JPG 或 PNG。";
   } finally {
@@ -371,6 +396,8 @@ $("gallery").onchange = pickPhoto;
 $("remove-photo").onclick = () => {
   photoVersion++;
   delete draft.photo;
+  delete draft.photos;
+  $("batch-preview").replaceChildren();
   draft.photoRemoved = true;
   $("form-status").textContent = "";
   busy(false);
@@ -407,7 +434,7 @@ $("form").onsubmit = async event => {
   const record = { ...draft, name };
   if (record.level > 1 && record.level < 4) record.positionType = $("position-type").value;
   if (record.level === 4 && record.photo) {
-    queuePhotoUpload(record);
+    queueSelectedPhotos(record, $("name").value.trim());
     return;
   }
   saving = true;

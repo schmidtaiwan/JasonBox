@@ -143,3 +143,6 @@ dialog::backdrop { background: #172c20a0; }
 .floor-tab { width: 50px; flex: 0 0 50px; padding-inline: 0; }
 
 .field select { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: inherit; background: white; color: inherit; }
+
+.batch-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.batch-preview .thumb { width: 72px; height: 72px; object-fit: contain; }

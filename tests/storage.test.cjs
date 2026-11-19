@@ -53,7 +53,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     }
   };
   vm.createContext(context);
-  for (const file of ['plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['appearance.js', 'plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
   assert.ok(run('changeDescription({updatedAt: "2026-11-19T04:00:00Z",updatedBy:"backy2777@example.com"})').endsWith(' · BACKY2777'));
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
@@ -134,6 +134,16 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   marker = get('floor-image').children[0].children.find(n => n.attrs.role === 'button');
   marker.onclick({ stopPropagation() {} });
   assert.equal(run('current.id'), storage.id);
+  get('current-space-icon').onclick();
+  assert.equal(get('appearance-dialog').open, true);
+  assert.equal(get('icon-choices').children.length, 8);
+  assert.equal(get('color-choices').children.length, 8);
+  get('icon-choices').children[1].onclick();
+  get('color-choices').children[1].onclick();
+  await get('appearance-save').onclick();
+  assert.equal(run('current.iconKey'), 'bed');
+  assert.equal(run('current.iconColor'), '#1768a6');
+
   assert.equal(get('floor-plans').hidden, true, 'cabinet opens a content screen');
   run('setSignedIn(true)');
   assert.equal(get('footer').hidden, false);
@@ -328,6 +338,10 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   assert.equal(marker.y, .26);
   assert.equal(marker.scale, 1.5);
   assert.ok(marker.updatedAt);
+  const styled = await run('drive.save({id:"space",name:"床",parent:"floor",level:1,iconKey:"bed",iconColor:"#1768a6"})');
+  assert.equal(styled.iconKey, 'bed');
+  assert.equal(styled.iconColor, '#1768a6');
+
   assert.equal(marker.updatedBy, 'jason660803@example.com');
   const item = await run('drive.save({name:"新物品",parent:"space",level:4})');
   assert.equal(item.name, '新物品');

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 33;
+const PAGE_BUILD = 34;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -272,6 +272,7 @@ function render() {
     : entries.filter(entry => entry.level !== 0 && entry.level !== 4 && entries.find(parent => parent.id === entry.parent)?.level === 0);
   renderFloorPlans(query);
   renderSpaceLayout(query);
+  renderCurrentSpaceIcon();
   const path = $("path");
   path.replaceChildren();
   for (const entry of [null, ...ancestors(current)]) {
@@ -707,3 +708,8 @@ if (window.location.protocol === "file:") {
 }
 
 $("export-pdf").onclick = exportPdf;
+
+$("current-space-icon").onclick = openAppearance;
+$("appearance-save").onclick = saveAppearance;
+$("appearance-close").onclick = () => { if (!appearanceSaving) $("appearance-dialog").close(); };
+$("appearance-dialog").oncancel = event => { if (appearanceSaving) event.preventDefault(); };

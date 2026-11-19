@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=33", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=34", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -185,7 +185,10 @@ function renderFloorPlans(query) {
       role: "button", tabindex: "0", "aria-label": "開啟存放空間：" + entry.name,
       class: "storage-marker" + (entry.id === current?.id ? " active" : "") + (entry.id === planAdjustment?.id ? " adjusting" : "")
     });
-    marker.append(svgNode("circle", { r: 19 }), svgNode("path", { d: "M-9-7H9V8H-9Z M-9-1H9 M-3-4H3 M-3 3H3" }));
+    const appearance = spaceAppearance(entry);
+    const circle = svgNode("circle", { r: 19 });
+    circle.style.fill = appearance.color;
+    marker.append(circle, svgNode("path", { d: appearance.icon[2] }));
     const text = svgNode("text", { y: 37, "text-anchor": "middle" });
     text.textContent = entry.name;
     marker.append(text);
@@ -296,7 +299,9 @@ function renderSpaceLayout(query) {
   for (const position of entries.filter(entry => entry.parent === space.id && entry.level !== 4)) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
-    marker.append(element("span", "▣", "space-photo-icon"), element("span", position.name, "space-photo-label"));
+    const iconHost = element("span", "", "space-photo-icon");
+    iconHost.append(spaceIconNode(position));
+    marker.append(iconHost, element("span", position.name, "space-photo-label"));
     marker.setAttribute("data-tone", "dark");
     const appearance = { marker, value: position };
     markers.push(appearance);

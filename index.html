@@ -6,19 +6,20 @@
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>收納管家</title>
-  <link rel="icon" href="icon.svg?v=33" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest?v=33">
-  <link rel="stylesheet" href="app.css?v=33">
+  <link rel="icon" href="icon.svg?v=34" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest?v=34">
+  <link rel="stylesheet" href="app.css?v=34">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
-  <script src="drive.js?v=33" defer></script>
-  <script src="plan.js?v=33" defer></script>
-  <script src="export.js?v=33" defer></script>
-  <script src="app.js?v=33" defer></script>
+  <script src="drive.js?v=34" defer></script>
+  <script src="appearance.js?v=34" defer></script>
+  <script src="plan.js?v=34" defer></script>
+  <script src="export.js?v=34" defer></script>
+  <script src="app.js?v=34" defer></script>
 </head>
 <body>
   <header class="brand">
-    <img src="icon.svg?v=33" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
+    <img src="icon.svg?v=34" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
       <p id="drive-quota" class="page-version" role="status"></p>
       <button id="retry-quota" class="quiet" hidden>重試讀取容量</button></div>
     <section id="header-storage" class="header-storage" hidden aria-label="收納與雲端容量">
@@ -38,15 +39,15 @@
     </div>
     <button id="login" class="primary">使用 Google 帳號登入</button>
     <p id="login-status" role="status"></p>
-    <img class="login-photo" src="assets/family.png?v=33" alt="家人在海邊的合照">
+    <img class="login-photo" src="assets/family.png?v=34" alt="家人在海邊的合照">
   </section>
   <main hidden>
     <section id="floor-plans" class="floor-plans" aria-labelledby="floor-heading">
       <h2 id="floor-heading" hidden>四層透天平面圖</h2>
       <div id="floor-tabs" class="floor-tabs" aria-label="選擇樓層"></div>
       <div id="marker-tools" class="marker-tools" role="region" aria-label="調整收納圖示" aria-live="polite" hidden></div>
-      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=33" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
-      <a class="plan-original" href="assets/floor-plans.png?v=33" target="_blank" rel="noopener">查看完整平面圖</a>
+      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=34" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
+      <a class="plan-original" href="assets/floor-plans.png?v=34" target="_blank" rel="noopener">查看完整平面圖</a>
     </section>
     <div class="path-toolbar">
       <nav id="path" aria-label="收納位置"></nav>
@@ -55,6 +56,7 @@
         <button type="button" id="view-details" aria-pressed="true">列表</button>
       </div>
       <button id="export-pdf" class="secondary export-button" type="button">匯出 PDF</button>
+      <button id="current-space-icon" type="button" class="current-space-icon" hidden></button>
     </div>
     <p id="mutation-status" role="status"></p>
     <section id="space-layout" class="space-layout" hidden aria-label="存放空間照片與內部位置"></section>
@@ -92,6 +94,14 @@
       <p id="form-status" role="status"></p>
       <div class="editor-actions"><button type="button" id="remove" class="danger" hidden>刪除</button><button class="primary" id="save">儲存</button></div>
     </form>
+  </dialog>
+  <dialog id="appearance-dialog" aria-labelledby="appearance-title">
+    <div class="section-title"><h2 id="appearance-title">圖示與顏色</h2><button id="appearance-close" class="quiet" aria-label="關閉">✕</button></div>
+    <div id="appearance-preview" class="appearance-preview"></div>
+    <p>選擇圖示</p><div id="icon-choices" class="appearance-grid" role="group" aria-label="選擇圖示"></div>
+    <p>選擇顏色</p><div id="color-choices" class="appearance-grid" role="group" aria-label="選擇顏色"></div>
+    <p id="appearance-status" role="status"></p>
+    <div class="editor-actions"><button id="appearance-save" class="primary">儲存</button></div>
   </dialog>
   <dialog id="update-dialog" aria-labelledby="update-title" aria-describedby="update-version">
     <h2 id="update-title">有新版可以更新</h2>

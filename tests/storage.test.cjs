@@ -187,7 +187,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('formatTime("2026-11-19T04:00:00Z")').includes('12:00:00'), true);
   run('navigate(entries.find(e => e.name === "床底下"))');
   get('add').onclick();
-  get('add-kind').value = '層';
+  get('add-kind').value = 'position';
   get('add-kind').onchange();
   assert.equal(run('draft.level'), 2);
   get('position-type').value = '層';
@@ -202,7 +202,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.ok(photoCanvas);
   assert.equal(photoCanvas.onclick, undefined, 'blank photo does not create positions');
   get('add').onclick();
-  get('add-kind').value = '區';
+  get('add-kind').value = 'position';
   get('add-kind').onchange();
   assert.equal(run('draft.parent'), storage.id);
   assert.equal(run('draft.photoX'), .5);
@@ -219,12 +219,13 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await get('form').onsubmit({ preventDefault() {} });
   assert.ok(records.some(r => r.name === '層內物品' && r.parent === position.id));
   run('navigate(entries.find(e => e.level === 0))');
-  assert.equal(get('add').disabled, false, 'items may also be added at the selected floor');
+  assert.equal(get('add').disabled, false);
   get('add').onclick();
   assert.equal(run('draft.parent'), run('current.id'));
-  get('name').value = '樓層物品';
-  await get('form').onsubmit({ preventDefault() {} });
-  assert.ok(records.some(r => r.name === '樓層物品' && r.parent === run('current.id')));
+  assert.equal(run('draft.level'), 1, 'floor Add defaults to space');
+  assert.equal(get('add-kind').children.length, 1, 'floors cannot select items');
+  assert.equal(get('add-kind').children[0].textContent, '空間');
+  run('closeEditor()');
   run('navigate(entries.find(e => e.name === "上層"))');
 
   run('edit(entries.find(e => e.name === "上層"))');

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 28;
+const PAGE_BUILD = 29;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -306,8 +306,8 @@ function edit(entry, placement) {
   if (entry?.level === 0 || (!entry && !current && !placement)) return;
   draft = entry ? { ...entry } : placement ? { ...placement } : { level: 4, parent: current.id };
   const isPosition = draft.level > 1 && draft.level < 4;
-  $("position-type-field").hidden = !isPosition;
-  const label = draft.level === 4 ? "物品" : isPosition ? "內部位置" : "存放空間";
+  $("position-type-field").hidden = true;
+  const label = draft.level === 4 ? "物品" : isPosition ? "空間（區格層）" : "存放空間";
   $("form").reset();
   $("add-kind-field").hidden = Boolean(draft.id);
   $("add-kind").replaceChildren(...availableAddKinds().map(([value, text]) => {
@@ -315,7 +315,7 @@ function edit(entry, placement) {
     option.value = value;
     return option;
   }));
-  $("add-kind").value = draft.level === 4 ? "item" : draft.level === 1 ? "space" : draft.positionType || "區";
+  $("add-kind").value = draft.level === 4 ? "item" : draft.level === 1 ? "space" : "position";
   $("gallery").multiple = !draft.id && draft.level === 4;
   $("batch-preview").replaceChildren();
   $("position-type").value = draft.positionType || "區";
@@ -420,19 +420,20 @@ $("remove-photo").onclick = () => {
 $("search").oninput = render;
 function availableAddKinds() {
   if (!current) return [];
-  return current.level === 0 ? [["item", "物品"], ["space", "空間／櫃子"]]
-    : current.level < 3 ? [["item", "物品"], ["區", "區"], ["格", "格"], ["層", "層"]]
+  return current.level === 0 ? [["space", "空間"]]
+    : current.level < 3 ? [["item", "物品"], ["position", "空間（區格層）"]]
     : [["item", "物品"]];
 }
 function newEntryAtCurrent(kind) {
   if (!current) return;
+  if (!availableAddKinds().some(([value]) => value === kind)) kind = availableAddKinds()[0][0];
   const record = { level: 4, parent: current.id };
   if (kind === "space" && current.level === 0) {
     const floor = floorNumber(current.name);
     const [left, top, right, bottom] = planBounds[(floor || 1) - 1];
     Object.assign(record, { level: 1, x: (left + right) / 2 / 1672, y: (top + bottom) / 2 / 941 });
-  } else if (["區", "格", "層"].includes(kind) && current.level > 0 && current.level < 3) {
-    Object.assign(record, { level: current.level + 1, positionType: kind, photoX: .5, photoY: .5 });
+  } else if (kind === "position" && current.level > 0 && current.level < 3) {
+    Object.assign(record, { level: current.level + 1, positionType: "區", photoX: .5, photoY: .5 });
   }
   edit(null, record);
 }
@@ -474,6 +475,11 @@ $("form").onsubmit = async event => {
     return;
   }
   const record = { ...draft, name };
+  const parent = entries.find(entry => entry.id === record.parent);
+  if (!record.id && record.level === 4 && parent?.level === 0) {
+    $("form-status").textContent = "樓層只能新增空間，請先進入空間再加入物品。";
+    return;
+  }
   if (record.level > 1 && record.level < 4) record.positionType = $("position-type").value;
   if (record.photo) {
     queueSelectedPhotos(record, $("name").value.trim());

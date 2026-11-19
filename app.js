@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 45;
+const PAGE_BUILD = 46;
 const PAGE_DATE = "2026-11-19";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -559,19 +559,21 @@ async function pickPhoto(event) {
   if (!file) return;
   if (!draft) return;
   if (draft.level === 4) photoVersion++;
+  if (draft.level < 4 && (draft.hasPhoto || draft.spaceAlbum) && !draft.photoRemoved) clearSelectedPhotos();
   const multiple = draft.level < 4 || !draft.id;
   const photos = (multiple ? files : files.slice(0, 1))
     .map(selected => ({ photo: selected, name: selected.name.replace(/\.[^.]+$/, "") }));
   draft.photos = multiple ? [...(draft.photos || []), ...photos] : photos;
   if (draft.level === 4) draft.photoRemoved = false;
   showPhoto();
-  $("form-status").textContent = "已選擇 " + draft.photos.length + " 張照片，儲存後於背景上傳。";
+  $("form-status").textContent = "已選擇 " + draft.photos.length + " 張照片，儲存後" +
+    (draft.level < 4 && draft.photoRemoved && (draft.hasPhoto || draft.spaceAlbum) ? "將取代舊照片。" : "於背景上傳。");
   busy(false);
 }
 
 $("camera").onchange = pickPhoto;
 $("gallery").onchange = pickPhoto;
-$("remove-photo").onclick = () => {
+function clearSelectedPhotos() {
   photoVersion++;
   delete draft.photos;
   delete draft.editedCover;
@@ -579,6 +581,9 @@ $("remove-photo").onclick = () => {
   savedAlbum = [];
   editorCover = undefined;
   draft.photoRemoved = true;
+}
+$("remove-photo").onclick = () => {
+  clearSelectedPhotos();
   $("form-status").textContent = "";
   busy(false);
   showPhoto();

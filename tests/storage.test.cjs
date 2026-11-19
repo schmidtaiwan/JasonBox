@@ -497,6 +497,13 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   const rotated = await run('drive.save({...photoSpace, photo:new Blob(["rotated"]), replaceCover:true, coverTransform:[0,1,-1,0,1,0]})');
   assert.equal(rotated.photoId, photoSpace.photoId);
   assert.deepEqual(Array.from(rotated.coverTransform), [0, 1, -1, 0, 1, 0]);
+  const oldAlbumIds = (await run('drive.spacePhotos("space")')).map(file => file.id);
+  context.oldSpace = rotated;
+  const replacement = await run('drive.save({...oldSpace, photoRemoved:true, coverTransform:undefined, photo:new Blob(["new cover"]), extraPhotos:[{name:"新近照",photo:new Blob(["new close"])}]})');
+  assert.notEqual(replacement.photoId, rotated.photoId);
+  assert.equal(files.get(rotated.photoId).trashed, true);
+  assert.ok(oldAlbumIds.every(id => files.get(id).trashed));
+  assert.deepEqual(Array.from(await run('drive.spacePhotos("space")'), file => file.name), ['新近照.jpg']);
   const original = (await run('drive.readEntries()')).find(entry => entry.id === 'direct');
   context.moveOriginal = original;
   const moved = await run('drive.moveItem(moveOriginal, {id:"cabinet"})');

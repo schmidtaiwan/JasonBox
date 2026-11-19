@@ -207,11 +207,10 @@ const drive = (() => {
         metadata.appProperties.photoY = String(record.photoY);
       }
       if (photoRemoved && id) {
-        if (!record.removedOldPhotos) {
+        if (!record.obsoletePhotoIds) {
           const album = record.spaceAlbum ? await spacePhotos(id) : [];
-          for (const file of album) await write({ trashed: true }, file.id);
-          if (record.photoId) await write({ trashed: true }, record.photoId);
-          record.removedOldPhotos = true;
+          record.obsoletePhotoIds = album.map(file => file.id);
+          if (record.photoId) record.obsoletePhotoIds.push(record.photoId);
         }
         metadata.appProperties.spacePhotoId = null;
         metadata.appProperties.spaceAlbum = null;
@@ -236,7 +235,12 @@ const drive = (() => {
       }
       if (record.extraPhotos?.length) metadata.appProperties.spaceAlbum = "1";
       if (!id) metadata.mimeType = folder;
-      return entryFromFile(await write(metadata, id), level);
+      const saved = entryFromFile(await write(metadata, id), level);
+      while (record.obsoletePhotoIds?.length) {
+        await write({ trashed: true }, record.obsoletePhotoIds[0]);
+        record.obsoletePhotoIds.shift();
+      }
+      return saved;
     }
     const jpeg = Boolean(photo || (hasPhoto && !photoRemoved));
     metadata.name += jpeg ? ".jpg" : ".json";

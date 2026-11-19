@@ -22,6 +22,10 @@ button:disabled { cursor: wait; opacity: .55; }
 #update-version { margin-top: 8px; }
 .gate #login { width: 100%; margin-top: 18px; }
 .gate #login-status { margin-top: 10px; color: var(--muted); }
+.gate h1 { line-height: 1.5; }
+.storage-heading { padding-block: 12px; }
+.storage-heading h1 { font-size: 1.5rem; }
+.storage-heading p { margin-top: 6px; color: var(--muted); }
 main { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 .hero { display: flex; position: relative; overflow: hidden; justify-content: space-between; align-items: center; min-height: 152px; padding: 24px; border-radius: 24px; background: #e1ead8; }
 h1, h2, p { margin: 0; overflow-wrap: anywhere; }

@@ -55,6 +55,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   vm.createContext(context);
   for (const file of ['plan.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
+  assert.ok(run('changeDescription({updatedAt: "2026-11-19T04:00:00Z",updatedBy:"backy2777@example.com"})').endsWith(' · BACKY2777'));
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
   assert.equal(run('markerTone([0,0,0,255])'), 'light', 'dark photo uses light markers');
   assert.equal(run('markerTone([0,0,0,0])'), 'dark', 'transparent photo is treated as white');
@@ -300,7 +301,8 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   const source = fs.readFileSync(path.join(__dirname, '..', 'drive.js'), 'utf8')
     .replace('let token;', 'let token = "test";')
     .replace('let expiresAt;', 'let expiresAt = Infinity;')
-    .replace('let root;', 'let root = "root";');
+    .replace('let root;', 'let root = "root";')
+    .replace('let accountInfo;', 'let accountInfo = {email:"jason660803@example.com"};');
   vm.runInContext(source, context);
   const run = code => vm.runInContext(code, context);
   const entries = await run('drive.readEntries()');
@@ -311,6 +313,7 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   assert.equal(marker.y, .26);
   assert.equal(marker.scale, 1.5);
   assert.ok(marker.updatedAt);
+  assert.equal(marker.updatedBy, 'jason660803@example.com');
   const item = await run('drive.save({name:"新物品",parent:"space",level:4})');
   assert.equal(item.name, '新物品');
   assert.equal(item.parent, 'space');
@@ -320,6 +323,7 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   const touched = await run('drive.touch({id:"space",level:1})');
   assert.equal(touched.x, .36, 'parent time updates preserve marker coordinates');
   assert.equal(touched.scale, 1.5, 'parent time updates preserve marker size');
+  assert.equal(touched.updatedBy, 'jason660803@example.com');
   const position = await run('drive.save({name:"第2格",parent:"space",level:2,positionType:"格"})');
   assert.equal(position.positionType, '格');
   const positionEntries = await run('drive.readEntries()');

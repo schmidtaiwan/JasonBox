@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 29;
+const PAGE_BUILD = 30;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -160,7 +160,7 @@ function queueSelectedPhotos(record, name) {
 
 function queuePhotoUpload(record) {
   const id = record.id || "pending-photo-" + ++uploadSequence;
-  const local = { ...record, id, hasPhoto: true, updatedAt: new Date().toISOString(),
+  const local = { ...record, id, hasPhoto: true, updatedAt: new Date().toISOString(), updatedBy: drive.account()?.email,
     createdAt: record.createdAt || new Date().toISOString() };
   const job = { id, record, local, failed: false, running: false };
   photoUploads.set(id, job);
@@ -223,6 +223,11 @@ function photoListCard(entry) {
   return section;
 }
 
+function changeDescription(entry) {
+  const account = entry.updatedBy ? entry.updatedBy.split("@")[0].toUpperCase() : "未記錄";
+  return formatTime(entry.updatedAt) + " · " + account;
+}
+
 function card(entry, searching) {
   if (displayMode === "list") return photoListCard(entry);
   const row = element("div", "", "card");
@@ -241,7 +246,7 @@ function card(entry, searching) {
   open.append(thumb, description, arrow);
   if (entry.hasPhoto && displayMode === "details") displayThumbnail(thumb, entry);
   if (uploadStatus(entry)) description.append(element("small", uploadStatus(entry), "upload-status"));
-  description.append(element("small", "更動：" + formatTime(entry.updatedAt), "changed-time"));
+  description.append(element("small", "更動：" + changeDescription(entry), "changed-time"));
   row.append(open);
   if (!isItem && entry.level !== 0) {
     const editButton = button("編輯", "quiet", () => edit(entry));
@@ -280,7 +285,7 @@ function render() {
   }
   $("page-title").textContent = current?.name ?? "我的收納";
   $("summary").textContent = current
-    ? (current.level === 0 ? "按下方「加入」新增空間或物品" : "更動：" + formatTime(current.updatedAt))
+    ? (current.level === 0 ? "按下方「加入」新增空間或物品" : "更動：" + changeDescription(current))
     : "固定四層樓　·　" +
       entries.filter(entry => entry.level === 4).length + " 件物品";
   $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "內部位置與物品";
@@ -326,7 +331,7 @@ function edit(entry, placement) {
   $("name").value = draft.name ?? "";
   $("name").required = draft.level !== 4;
   $("name").placeholder = draft.level === 4 ? "例如 羊毛圍巾（有照片時可不填）" : isPosition ? "例如 左區、第 2 格、上層" : "例如 櫃子、床底下";
-  $("entry-time").textContent = entry ? "建立：" + formatTime(entry.createdAt) + "；更動：" + formatTime(entry.updatedAt) : "儲存時自動記錄建立與更動時間（台北）";
+  $("entry-time").textContent = entry ? "建立：" + formatTime(entry.createdAt) + "；更動：" + changeDescription(entry) : "儲存時自動記錄建立與更動時間（台北）";
   $("remove").hidden = !entry;
   $("photos").hidden = draft.level === 0;
   busy(false);

@@ -106,6 +106,7 @@ const drive = (() => {
       hasPhoto,
       createdAt: file.createdTime,
       updatedAt: file.appProperties?.updatedAt || file.modifiedTime,
+      updatedBy: file.appProperties?.updatedBy,
       x: file.appProperties?.x === undefined ? undefined : Number(file.appProperties.x),
       y: file.appProperties?.y === undefined ? undefined : Number(file.appProperties.y),
       scale: Number(file.appProperties?.scale) || 1
@@ -156,7 +157,7 @@ const drive = (() => {
 
   async function save(record) {
     const { id, name, parent, level, photo, hasPhoto, photoRemoved } = record;
-    const metadata = { name, appProperties: { updatedAt: new Date().toISOString() } };
+    const metadata = { name, appProperties: { updatedAt: new Date().toISOString(), updatedBy: accountInfo?.email || "未記錄" } };
     if (Number.isFinite(record.x) && Number.isFinite(record.y)) {
       metadata.appProperties.x = String(record.x);
       metadata.appProperties.y = String(record.y);
@@ -212,7 +213,7 @@ const drive = (() => {
   }
 
   async function touch(entry) {
-    return entryFromFile(await write({ appProperties: { updatedAt: new Date().toISOString() } }, entry.id), entry.level);
+    return entryFromFile(await write({ appProperties: { updatedAt: new Date().toISOString(), updatedBy: accountInfo?.email || "未記錄" } }, entry.id), entry.level);
   }
 
   async function quota() {

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 15;
+const PAGE_BUILD = 16;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -120,6 +120,9 @@ function photoListCard(entry) {
   heading.append(button(entry.name, "quiet", () => entry.level === 4 ? edit(entry) : navigate(entry)));
   if (entry.level !== 4 && entry.level !== 0) heading.append(button("編輯", "quiet", () => edit(entry)));
   section.append(heading);
+  for (const child of entries.filter(item => item.parent === entry.id && item.level !== 4)) {
+    section.append(button((child.positionType || "位置") + "：" + child.name, "quiet", () => navigate(child)));
+  }
   const items = entry.level === 4 ? [entry] : entries.filter(item =>
     item.level === 4 && ancestors(item).some(parent => parent.id === entry.id));
   const gallery = element("div", "", "photo-list-gallery");
@@ -151,7 +154,7 @@ function card(entry, searching) {
   if (searching && path) description.append(element("small", path));
   else if (!isItem) description.append(element("small",
     children.filter(child => child.level === 4).length + " 件物品 · " + children.filter(child => child.level !== 4).length + " 個空間"));
-  const thumb = element("span", labels[entry.level], "thumb");
+  const thumb = element("span", entry.positionType || labels[entry.level], "thumb");
   const arrow = element("span", "›");
   arrow.setAttribute("aria-hidden", "true");
   open.append(thumb, description, arrow);
@@ -200,11 +203,12 @@ function render() {
     ? (current.level === 0 ? "點平面圖新增存放空間" : "更動：" + formatTime(current.updatedAt))
     : "固定四層樓　·　" +
       entries.filter(entry => entry.level === 4).length + " 件物品";
-  $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "存放物品";
+  $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "內部位置與物品";
   $("count").textContent = visible.length + (depth === 4 && !query ? " 件" : " 筆");
   $("add").textContent = "＋ 新增存放物品";
   $("add").hidden = !current || current.level === 0 || Boolean(query);
   document.querySelector("footer").hidden = $("add").hidden;
+  $("add-position").hidden = !current || current.level < 1 || current.level >= 3 || Boolean(query);
   $("edit-space").hidden = !current || current.level === 0;
   $("edit-space").onclick = () => edit(current);
   $("list").replaceChildren(...visible.map(entry => card(entry, Boolean(query))));
@@ -220,15 +224,18 @@ function edit(entry, placement) {
   if (entry?.level === 0 || (!entry && !current && !placement)) return;
   if (!entry && !placement && current?.level === 0) return;
   draft = entry ? { ...entry } : placement ? { ...placement } : { level: 4, parent: current.id };
-  const label = draft.level === 4 ? "物品" : "存放空間";
+  const isPosition = draft.level > 1 && draft.level < 4;
+  $("position-type-field").hidden = !isPosition;
+  const label = draft.level === 4 ? "物品" : isPosition ? "內部位置" : "存放空間";
   $("form").reset();
+  $("position-type").value = draft.positionType || "區";
   $("form-status").textContent = "";
   $("editor-title").textContent = (entry ? "編輯" : "新增") + label;
   $("location").textContent = ancestors(entries.find(parent => parent.id === draft.parent))
     .map(parent => parent.name).join(" / ");
   $("name").value = draft.name ?? "";
   $("name").required = draft.level !== 4;
-  $("name").placeholder = draft.level === 4 ? "例如 羊毛圍巾（有照片時可不填）" : "例如 櫃子、床底下";
+  $("name").placeholder = draft.level === 4 ? "例如 羊毛圍巾（有照片時可不填）" : isPosition ? "例如 左區、第 2 格、上層" : "例如 櫃子、床底下";
   $("entry-time").textContent = entry ? "建立：" + formatTime(entry.createdAt) + "；更動：" + formatTime(entry.updatedAt) : "儲存時自動記錄建立與更動時間（台北）";
   $("remove").hidden = !entry;
   $("photos").hidden = draft.level !== 4;
@@ -307,6 +314,10 @@ $("remove-photo").onclick = () => {
 };
 $("search").oninput = render;
 $("add").onclick = () => edit();
+$("add-position").onclick = () => {
+  if (!current || current.level < 1 || current.level >= 3) return;
+  edit(null, { level: current.level + 1, parent: current.id, positionType: "區" });
+};
 $("close").onclick = () => { if (!saving) closeEditor(); };
 editor.oncancel = event => {
   event.preventDefault();
@@ -330,6 +341,7 @@ $("form").onsubmit = async event => {
     return;
   }
   const record = { ...draft, name };
+  if (record.level > 1 && record.level < 4) record.positionType = $("position-type").value;
   saving = true;
   busy(true);
   $("form-status").textContent = "正在儲存到 Google Drive…";

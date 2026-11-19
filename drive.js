@@ -99,6 +99,7 @@ const drive = (() => {
       name: level === 4 ? file.name.replace(/\.(jpg|json)$/, "") : file.name,
       parent: file.parents[0] === root ? null : file.parents[0],
       level,
+      positionType: file.appProperties?.positionType,
       hasPhoto,
       createdAt: file.createdTime,
       updatedAt: file.appProperties?.updatedAt || file.modifiedTime,
@@ -166,6 +167,7 @@ const drive = (() => {
       metadata.parents = [parentId];
     }
     if (level < 4) {
+      if (["區", "格", "層"].includes(record.positionType)) metadata.appProperties.positionType = record.positionType;
       if (!id) metadata.mimeType = folder;
       return entryFromFile(await write(metadata, id), level);
     }

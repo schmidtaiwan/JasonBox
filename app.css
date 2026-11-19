@@ -164,3 +164,6 @@ footer { z-index: 20; }
 .space-photo-marker[data-tone="light"] { --marker-bg: #fff; --marker-fg: #111; }
 .space-photo-marker .space-photo-icon { background: var(--marker-bg); color: var(--marker-fg); border-color: var(--marker-fg); box-shadow: 0 0 0 1px var(--marker-bg); }
 .space-photo-label { padding: 2px 6px; border-radius: 5px; background: var(--marker-bg); color: var(--marker-fg); border: 1px solid var(--marker-fg); line-height: 1.4; overflow-wrap: anywhere; }
+
+.login-photo { display: block; width: 100%; height: auto; margin-top: 16px; border-radius: 16px; }
+.gate { padding-bottom: 20px; }

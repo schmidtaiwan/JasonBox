@@ -38,6 +38,8 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     IntersectionObserver: class { disconnect() {} observe() {} },
     drive: {
       SessionExpired: class extends Error {},
+      account: () => ({ email: 'test@example.com', name: 'Test', picture: 'https://example.com/avatar.png' }),
+      quota: async () => ({ usage: '1073741824', limit: '16106127360' }),
       readEntries: async () => records.map(r => ({ ...r })),
       save: async r => {
         const saved = { ...r, id: r.id || String(++count), createdAt: r.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -123,6 +125,26 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('formatTime("2026-11-19T04:00:00Z")').includes('12:00:00'), true);
   run('edit(entries[0])');
   assert.equal(get('editor').open, false, 'fixed floor cannot be edited');
+  run('setSignedIn(true)');
+  await run('refreshQuota()');
+  assert.equal(get('header-storage').hidden, false);
+  assert.equal(get('account-email').textContent, 'test@example.com');
+  assert.equal(get('account-avatar').hidden, false);
+  assert.match(get('drive-quota').textContent, /1 GB.*15 GB.*14 GB/);
+  get('account-avatar').onerror();
+  assert.equal(get('avatar-fallback').hidden, false);
+  context.drive.quota = async () => { throw new Error('offline'); };
+  await run('refreshQuota()');
+  assert.equal(get('retry-quota').hidden, false, 'quota failures can be retried');
+  let resolveQuota;
+  context.drive.quota = () => new Promise(resolve => { resolveQuota = resolve; });
+  const pending = run('refreshQuota()');
+  run('setSignedIn(false)');
+  resolveQuota({ usage: '1', limit: '15' });
+  await pending;
+  assert.equal(get('drive-quota').textContent, '', 'late quota response cannot repopulate signed-out account');
+  assert.equal(get('header-storage').hidden, true);
+  assert.equal(get('account-menu').hidden, true);
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {
@@ -140,6 +162,7 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   const fetch = async (url, options = {}) => {
     const parsed = new URL(url);
     const id = parsed.pathname.split('/').pop();
+    if (id === 'about') return Response.json({ storageQuota: { usage: '1024', limit: '2048' } });
     if (options.method) {
       let metadata;
       if (typeof options.body === 'string') metadata = JSON.parse(options.body);
@@ -186,4 +209,7 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   const touched = await run('drive.touch({id:"space",level:1})');
   assert.equal(touched.x, .36, 'parent time updates preserve marker coordinates');
   assert.equal(touched.scale, 1.5, 'parent time updates preserve marker size');
+  const quota = await run('drive.quota()');
+  assert.equal(quota.usage, '1024');
+  assert.equal(quota.limit, '2048');
 });

@@ -9,6 +9,7 @@ const drive = (() => {
   let token;
   let expiresAt;
   let root;
+  let accountInfo;
 
   class SessionExpired extends Error {}
 
@@ -29,6 +30,7 @@ const drive = (() => {
     token = undefined;
     expiresAt = undefined;
     root = undefined;
+    accountInfo = undefined;
   }
 
   async function login(config) {
@@ -53,8 +55,18 @@ const drive = (() => {
       if (account.email?.toLowerCase() !== config.owner || account.verified_email !== true) {
         throw new Error("請用 " + config.owner + " 登入。");
       }
+      accountInfo = account;
       if (!oauth.hasGrantedAllScopes(result, ...scope.split(" "))) {
         throw new Error("請允許 Google Drive 存取權限後重新登入。");
+      }
+      if (!account.picture || !account.name) {
+        try {
+          const details = await (await request("https://www.googleapis.com/drive/v3/about?fields=user(displayName,photoLink)")).json();
+          account.picture ||= details.user?.photoLink;
+          account.name ||= details.user?.displayName;
+        } catch (error) {
+          if (error instanceof SessionExpired) throw error;
+        }
       }
       const roots = await list("'root' in parents and 'me' in owners and name='JasonBox' and mimeType='" + folder + "'");
       roots.sort((a, b) => a.createdTime.localeCompare(b.createdTime));
@@ -182,5 +194,12 @@ const drive = (() => {
     return entryFromFile(await write({ appProperties: { updatedAt: new Date().toISOString() } }, entry.id), entry.level);
   }
 
-  return { login, logout, readEntries, save, remove, photo, touch, SessionExpired };
+  async function quota() {
+    const response = await request("https://www.googleapis.com/drive/v3/about?fields=storageQuota");
+    const data = await response.json();
+    if (!data.storageQuota) throw new Error("無法取得雲端硬碟容量。");
+    return data.storageQuota;
+  }
+
+  return { login, logout, readEntries, save, remove, photo, touch, quota, account: () => accountInfo, SessionExpired };
 })();

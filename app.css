@@ -18,6 +18,20 @@ button:disabled { cursor: wait; opacity: .55; }
 .brand { display: flex; gap: 10px; align-items: center; min-height: 70px; padding-top: env(safe-area-inset-top); font-size: 1.15rem; letter-spacing: .08em; }
 .brand img { width: 36px; height: 36px; }
 .brand button { margin-left: auto; }
+.brand { flex-wrap: wrap; padding-bottom: 12px; }
+.brand-name { flex-shrink: 0; }
+.header-storage { flex: 1; min-width: 160px; margin-left: 10px; letter-spacing: normal; }
+.header-storage h1 { font-size: 1.15rem; }
+.header-storage p { font-size: .8rem; line-height: 1.6; color: var(--muted); }
+.header-storage #retry-quota { padding: 0; min-height: 32px; font-size: .8rem; }
+.account-menu { position: relative; margin-left: auto; align-self: flex-start; margin-top: 16px; }
+.account-menu > summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #e1ead8; border: 2px solid #b6c9ba; }
+.account-menu > summary::-webkit-details-marker { display: none; }
+.account-menu img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.account-panel { position: absolute; right: 0; top: 52px; z-index: 6; width: max-content; max-width: calc(100vw - 32px); padding: 14px; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 20px #20382b22; background: white; letter-spacing: normal; font-size: .9rem; }
+@media (max-width: 560px) {
+  .header-storage { order: 3; flex-basis: 100%; margin: 0 0 0 46px; }
+}
 .page-version { margin-top: 2px; font-size: .75rem; letter-spacing: normal; color: var(--muted); }
 #update-version { margin-top: 8px; }
 .gate #login { width: 100%; margin-top: 18px; }

@@ -6,17 +6,30 @@
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>收好收滿</title>
-  <link rel="icon" href="icon.svg?v=9" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest?v=9">
-  <link rel="stylesheet" href="app.css?v=9">
+  <link rel="icon" href="icon.svg?v=10" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest?v=10">
+  <link rel="stylesheet" href="app.css?v=10">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
-  <script src="drive.js?v=9" defer></script>
-  <script src="plan.js?v=9" defer></script>
-  <script src="app.js?v=9" defer></script>
+  <script src="drive.js?v=10" defer></script>
+  <script src="plan.js?v=10" defer></script>
+  <script src="app.js?v=10" defer></script>
 </head>
 <body>
-  <header class="brand"><img src="icon.svg?v=9" alt=""><div><strong>收好收滿</strong><p id="page-version" class="page-version"></p></div><button id="logout" class="quiet" hidden>登出</button></header>
+  <header class="brand">
+    <img src="icon.svg?v=10" alt=""><div class="brand-name"><strong>收好收滿</strong><p id="page-version" class="page-version"></p></div>
+    <section id="header-storage" class="header-storage" hidden aria-label="收納與雲端容量">
+      <h1 id="page-title">我的收納</h1><p id="summary"></p>
+      <p id="drive-quota" role="status"></p>
+      <button id="retry-quota" class="quiet" hidden>重試讀取容量</button>
+    </section>
+    <details id="account-menu" class="account-menu" hidden>
+      <summary id="account-toggle" aria-label="登入帳號">
+        <img id="account-avatar" alt="" referrerpolicy="no-referrer" hidden><span id="avatar-fallback">G</span>
+      </summary>
+      <div class="account-panel"><p id="account-email"></p><button id="logout" class="quiet" hidden>登出</button></div>
+    </details>
+  </header>
   <section id="gate" class="gate" aria-labelledby="gate-title">
     <div class="hero">
       <div><h1 id="gate-title">三生有杏<br>收好收滿</h1></div>
@@ -26,17 +39,13 @@
     <p id="login-status" role="status"></p>
   </section>
   <main hidden>
-    <section class="storage-heading">
-      <div><h1 id="page-title">我的收納</h1><p id="summary"></p></div>
-    </section>
     <section id="floor-plans" class="floor-plans" aria-labelledby="floor-heading">
-      <div class="section-title"><h2 id="floor-heading">我的四層透天</h2><span>固定樓層</span></div>
-      <p class="muted">直接點圖上的位置新增存放空間，命名為「櫃子」或「床底下」；點圖示即可放入物品。鍵盤可用 Enter 在所選樓層中央新增。</p>
+      <h2 id="floor-heading" hidden>四層透天平面圖</h2>
       <div id="floor-tabs" class="floor-tabs" aria-label="選擇樓層"></div>
       <p class="muted">按住收納圖示 1 秒可移動或調整大小，完成後按「儲存調整」。鍵盤可選取圖示後按 F2。</p>
       <div id="marker-tools" class="marker-tools" role="region" aria-label="調整收納圖示" aria-live="polite" hidden></div>
-      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=9" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
-      <a class="plan-original" href="assets/floor-plans.png?v=9" target="_blank" rel="noopener">查看完整平面圖</a>
+      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=10" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
+      <a class="plan-original" href="assets/floor-plans.png?v=10" target="_blank" rel="noopener">查看完整平面圖</a>
     </section>
     <label class="search"><span aria-hidden="true">⌕</span><input type="search" id="search" placeholder="搜尋存放空間或物品" aria-label="搜尋存放空間或物品"></label>
     <nav id="path" aria-label="收納位置"></nav>

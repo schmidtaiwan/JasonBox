@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 9;
+const PAGE_BUILD = 10;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -356,13 +356,70 @@ function showPhoto(blob = draft?.photo) {
   else $("preview").removeAttribute("src");
 }
 
+let quotaGeneration = 0;
+
+function formatStorage(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value < 0) return "未知";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const index = value ? Math.min(4, Math.floor(Math.log(value) / Math.log(1024))) : 0;
+  return (value / 1024 ** index).toLocaleString("zh-TW", { maximumFractionDigits: 2 }) + " " + units[index];
+}
+
+async function refreshQuota() {
+  const generation = ++quotaGeneration;
+  $("drive-quota").textContent = "雲端硬碟容量：讀取中…";
+  $("retry-quota").hidden = true;
+  try {
+    const quota = await drive.quota();
+    if (generation !== quotaGeneration) return;
+    const limit = Number(quota.limit);
+    $("drive-quota").textContent = "雲端容量：已用 " + formatStorage(quota.usage) +
+      (Number.isFinite(limit) && limit > 0 ? "／" + formatStorage(limit) + "，剩餘 " + formatStorage(Math.max(0, limit - Number(quota.usage))) : "（未提供容量上限）");
+    $("drive-quota").title = "目前登入帳號的 Google 儲存空間，包含雲端硬碟、Gmail 與 Google 相簿。";
+  } catch {
+    if (generation !== quotaGeneration) return;
+    $("drive-quota").textContent = "雲端硬碟容量：讀取失敗";
+    $("retry-quota").hidden = false;
+  }
+}
+
 function setSignedIn(signedIn) {
   document.querySelector("main").hidden = !signedIn;
   document.querySelector("footer").hidden = !signedIn || $("add").hidden;
   $("gate").hidden = signedIn;
   $("logout").hidden = !signedIn;
   $("add").disabled = !signedIn;
+  $("header-storage").hidden = !signedIn;
+  $("account-menu").hidden = !signedIn;
+  $("account-menu").open = false;
+  quotaGeneration++;
+  $("drive-quota").textContent = "";
+  $("account-email").textContent = "";
+  const avatar = $("account-avatar");
+  avatar.hidden = true;
+  avatar.removeAttribute("src");
+  $("avatar-fallback").hidden = false;
+  if (signedIn) {
+    const account = drive.account();
+    $("account-email").textContent = account.email;
+    $("account-toggle").setAttribute("aria-label", "登入帳號：" + account.email);
+    $("account-toggle").title = account.email;
+    $("avatar-fallback").textContent = Array.from(account.name || account.email || "G")[0].toUpperCase();
+    if (account.picture && /^https:\/\//i.test(account.picture)) {
+      avatar.src = account.picture;
+      avatar.hidden = false;
+      $("avatar-fallback").hidden = true;
+    }
+    void refreshQuota();
+  }
 }
+
+$("retry-quota").onclick = refreshQuota;
+$("account-avatar").onerror = () => {
+  $("account-avatar").hidden = true;
+  $("avatar-fallback").hidden = false;
+};
 
 function signOut(message = "") {
   if (editor.open) closeEditor();

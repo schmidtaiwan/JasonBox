@@ -169,3 +169,9 @@ footer { z-index: 20; }
 .gate { padding-bottom: 20px; }
 
 .export-button { min-height: 44px; padding: 6px 12px; font-size: .9rem; }
+
+.footer-actions > button { display: grid; place-items: center; }
+.footer-actions svg { width: 24px; height: 24px; pointer-events: none; }
+.footer-search { width: min(100% - 32px, 680px); margin: 0 auto 10px; }
+.footer-search .search { margin: 0; }
+#toggle-search[aria-expanded="true"] { background: var(--green); color: white; }

@@ -63,6 +63,15 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(records.length, 4, 'no duplicate floors on reload');
   assert.equal(get('add').hidden, false);
   assert.equal(get('add').disabled, true);
+  run('setSearchOpen(false)');
+  get('toggle-search').onclick();
+  assert.equal(get('search-panel').hidden, false);
+  assert.equal(get('toggle-search').attrs['aria-expanded'], 'true');
+  get('search').value = '搜尋文字';
+  get('toggle-search').onclick();
+  assert.equal(get('search-panel').hidden, true);
+  assert.equal(get('search').value, '', 'closing search restores the normal content');
+
   get('view-list').onclick();
   assert.equal(get('list').className, 'compact-list');
   assert.equal(get('view-list').attrs['aria-pressed'], 'true');

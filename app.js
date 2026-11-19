@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 31;
+const PAGE_BUILD = 32;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -114,6 +114,7 @@ function navigate(entry, remember = true) {
   if (remember && current?.id !== entry?.id) navigationHistory.push({ id: current?.id ?? null, x: window.scrollX, y: window.scrollY, query: $("search").value });
   current = entry;
   $("search").value = "";
+  setSearchOpen(false);
   render();
   window.scrollTo(0, 0);
 }
@@ -290,7 +291,6 @@ function render() {
       entries.filter(entry => entry.level === 4).length + " 件物品";
   $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "內部位置與物品";
   $("count").textContent = visible.length + (depth === 4 && !query ? " 件" : " 筆");
-  $("add").textContent = "加入";
   $("add").hidden = false;
   $("add").disabled = !signedIn || !current;
   $("add").title = current ? "加入到「" + ancestors(current).map(entry => entry.name).join(" / ") + "」" : "請先選擇樓層、櫃子或內部位置";
@@ -422,7 +422,26 @@ $("remove-photo").onclick = () => {
   busy(false);
   showPhoto();
 };
-$("search").oninput = render;
+function setSearchOpen(open) {
+  $("search-panel").hidden = !open;
+  $("toggle-search").setAttribute("aria-expanded", String(open));
+  document.querySelector("main").style.paddingBottom = open ? "calc(170px + env(safe-area-inset-bottom))" : "";
+}
+$("toggle-search").onclick = () => {
+  const open = $("search-panel").hidden;
+  setSearchOpen(open);
+  if (open) $("search").focus();
+  else { $("search").value = ""; render(); }
+};
+$("search").oninput = () => { render(); window.scrollTo(0, 0); };
+$("search").onkeydown = event => {
+  if (event.key === "Escape") {
+    $("search").value = "";
+    setSearchOpen(false);
+    render();
+    $("toggle-search").focus();
+  }
+};
 function availableAddKinds() {
   if (!current) return [];
   return current.level === 0 ? [["space", "空間"]]
@@ -454,6 +473,7 @@ $("back").onclick = () => {
   const previous = navigationHistory.length ? navigationHistory.pop() : { id: current?.parent, x: 0, y: 0, query: "" };
   navigate(entries.find(entry => entry.id === previous.id) || null, false);
   $("search").value = previous.query || "";
+  setSearchOpen(Boolean(previous.query));
   render();
   window.scrollTo(previous.x, previous.y);
 };

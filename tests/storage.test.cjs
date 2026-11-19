@@ -20,6 +20,7 @@ class Node {
   hasPointerCapture(id) { return this.pointerId === id; }
   releasePointerCapture() { this.pointerId = null; }
   classList = { add() {}, remove() {} };
+  getBoundingClientRect() { return { left: 0, top: 0, width: 400, height: 300 }; }
   getScreenCTM() { return { inverse: () => ({}) }; }
   createSVGPoint() { return { matrixTransform() { return { x: this.x, y: this.y }; } }; }
 }
@@ -185,6 +186,17 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const position = records.find(r => r.name === '上層');
   assert.equal(position.positionType, '層');
   assert.equal(position.parent, storage.id);
+  run('current = {...current, hasPhoto:true, photo:new Blob(["space photo"])}; render()');
+  assert.equal(get('space-layout').hidden, false);
+  const photoCanvas = get('space-layout').children.find(node => node.className === 'space-photo-canvas');
+  assert.ok(photoCanvas);
+  photoCanvas.onclick({ clientX: 100, clientY: 150 });
+  assert.equal(run('draft.parent'), storage.id);
+  assert.equal(run('draft.photoX'), .25);
+  assert.equal(run('draft.photoY'), .5);
+  assert.equal(run('draft.positionType'), '區');
+  run('closeEditor()');
+
   run('navigate(entries.find(e => e.name === "上層"))');
   get('add').onclick();
   assert.equal(run('draft.parent'), position.id);
@@ -287,6 +299,16 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   assert.equal(position.positionType, '格');
   const positionEntries = await run('drive.readEntries()');
   assert.equal(positionEntries.find(e => e.id === position.id).positionType, '格');
+  const photoSpace = await run('drive.save({id:"space",name:"床",level:1,parent:"floor",photo:new Blob(["space photo"])})');
+  assert.ok(photoSpace.photoId);
+  assert.equal(photoSpace.hasPhoto, true);
+  assert.equal(files.get(photoSpace.photoId).parents[0], 'space');
+  const placed = await run('drive.save({id:"' + position.id + '",name:"第2格",parent:"space",level:2,positionType:"格",photoX:.25,photoY:.5})');
+  assert.equal(placed.photoX, .25);
+  assert.equal(placed.photoY, .5);
+  const afterPhoto = await run('drive.readEntries()');
+  assert.equal(afterPhoto.find(e => e.id === 'space').photoId, photoSpace.photoId);
+
   const quota = await run('drive.quota()');
   assert.equal(quota.usage, '1024');
   assert.equal(quota.limit, '2048');

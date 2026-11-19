@@ -93,13 +93,16 @@ const drive = (() => {
 
   function entryFromFile(file, level) {
     if (file.appProperties?.jasonBoxItem === "1") level = 4;
-    const hasPhoto = file.mimeType === "image/jpeg";
+    const hasPhoto = file.mimeType === "image/jpeg" || Boolean(file.appProperties?.spacePhotoId);
     return {
       id: file.id,
       name: level === 4 ? file.name.replace(/\.(jpg|json)$/, "") : file.name,
       parent: file.parents[0] === root ? null : file.parents[0],
       level,
       positionType: file.appProperties?.positionType,
+      photoId: file.appProperties?.spacePhotoId,
+      photoX: file.appProperties?.photoX === undefined ? undefined : Number(file.appProperties.photoX),
+      photoY: file.appProperties?.photoY === undefined ? undefined : Number(file.appProperties.photoY),
       hasPhoto,
       createdAt: file.createdTime,
       updatedAt: file.appProperties?.updatedAt || file.modifiedTime,
@@ -167,7 +170,23 @@ const drive = (() => {
       metadata.parents = [parentId];
     }
     if (level < 4) {
+      if (!id && photo) {
+        const created = await write({ ...metadata, mimeType: folder });
+        return save({ ...record, id: created.id });
+      }
       if (["區", "格", "層"].includes(record.positionType)) metadata.appProperties.positionType = record.positionType;
+      if (Number.isFinite(record.photoX) && Number.isFinite(record.photoY)) {
+        metadata.appProperties.photoX = String(record.photoX);
+        metadata.appProperties.photoY = String(record.photoY);
+      }
+      if (photo) {
+        const photoMetadata = { name: ".space-photo.jpg", mimeType: "image/jpeg" };
+        if (!record.photoId) photoMetadata.parents = [id || parent || root];
+        const uploaded = await write(photoMetadata, record.photoId, photo, "image/jpeg");
+        metadata.appProperties.spacePhotoId = uploaded.id;
+      } else if (photoRemoved) {
+        metadata.appProperties.spacePhotoId = null;
+      }
       if (!id) metadata.mimeType = folder;
       return entryFromFile(await write(metadata, id), level);
     }
@@ -181,7 +200,7 @@ const drive = (() => {
   }
 
   async function remove(entry) {
-    if (entry.level < 4 && (await list("'" + entry.id + "' in parents")).length) {
+    if (entry.level < 4 && (await list("'" + entry.id + "' in parents")).some(file => file.id !== entry.photoId)) {
       throw new Error("請先清空這個 Google Drive 資料夾，再刪除。");
     }
     await write({ trashed: true }, entry.id);

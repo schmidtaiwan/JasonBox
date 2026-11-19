@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 22;
+const PAGE_BUILD = 23;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -143,7 +143,7 @@ function displayThumbnail(placeholder, entry) {
     objectUrls.push(img.src);
     placeholder.replaceWith(img);
   } else if (entry.hasPhoto) {
-    placeholder.dataset.id = entry.id;
+    placeholder.dataset.id = entry.photoId || entry.id;
     thumbnails.observe(placeholder);
   }
 }
@@ -165,6 +165,7 @@ function queuePhotoUpload(record) {
   const job = { id, record, local, failed: false, running: false };
   photoUploads.set(id, job);
   entries = entries.filter(entry => entry.id !== id).concat(local);
+  if (current?.id === id) current = local;
   closeEditor();
   render();
   void sendPhotoUpload(job);
@@ -179,6 +180,7 @@ async function sendPhotoUpload(job) {
     const saved = await drive.save(job.record);
     entries = entries.filter(entry => entry.id !== job.id).concat(saved);
     photoUploads.delete(job.id);
+    if (current?.id === job.id) current = saved;
     await touchParent(saved.parent);
   } catch (error) {
     job.failed = true;
@@ -263,6 +265,7 @@ function render() {
     : current ? entries.filter(entry => entry.parent === current.id)
     : entries.filter(entry => entry.level !== 0 && entry.level !== 4 && entries.find(parent => parent.id === entry.parent)?.level === 0);
   renderFloorPlans(query);
+  renderSpaceLayout(query);
   const path = $("path");
   path.replaceChildren();
   for (const entry of [null, ...ancestors(current)]) {
@@ -308,7 +311,7 @@ function edit(entry, placement) {
   $("position-type-field").hidden = !isPosition;
   const label = draft.level === 4 ? "物品" : isPosition ? "內部位置" : "存放空間";
   $("form").reset();
-  $("gallery").multiple = !draft.id;
+  $("gallery").multiple = !draft.id && draft.level === 4;
   $("batch-preview").replaceChildren();
   $("position-type").value = draft.positionType || "區";
   $("form-status").textContent = "";
@@ -320,14 +323,14 @@ function edit(entry, placement) {
   $("name").placeholder = draft.level === 4 ? "例如 羊毛圍巾（有照片時可不填）" : isPosition ? "例如 左區、第 2 格、上層" : "例如 櫃子、床底下";
   $("entry-time").textContent = entry ? "建立：" + formatTime(entry.createdAt) + "；更動：" + formatTime(entry.updatedAt) : "儲存時自動記錄建立與更動時間（台北）";
   $("remove").hidden = !entry;
-  $("photos").hidden = draft.level !== 4;
+  $("photos").hidden = draft.level === 0;
   busy(false);
   showPhoto();
   editor.showModal();
   if (entry?.hasPhoto) {
     const version = ++photoVersion;
     $("form-status").textContent = "正在載入照片…";
-    drive.photo(entry.id).then(blob => {
+    drive.photo(entry.photoId || entry.id).then(blob => {
       if (version !== photoVersion || !editor.open) return;
       showPhoto(blob);
       $("form-status").textContent = "";
@@ -374,7 +377,7 @@ async function pickPhoto(event) {
   $("form-status").textContent = "正在處理照片…";
   try {
     const photos = [];
-    for (const selected of (draft.id ? files.slice(0, 1) : files)) {
+    for (const selected of (draft.id || draft.level !== 4 ? files.slice(0, 1) : files)) {
       photos.push({ photo: await compress(selected), name: selected.name.replace(/\.[^.]+$/, "") });
       if (version !== photoVersion) return;
     }
@@ -447,7 +450,7 @@ $("form").onsubmit = async event => {
   }
   const record = { ...draft, name };
   if (record.level > 1 && record.level < 4) record.positionType = $("position-type").value;
-  if (record.level === 4 && record.photo) {
+  if (record.photo) {
     queueSelectedPhotos(record, $("name").value.trim());
     return;
   }

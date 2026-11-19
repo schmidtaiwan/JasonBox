@@ -151,3 +151,11 @@ footer { z-index: 20; }
 .footer-actions { display: flex; gap: 12px; }
 .footer-actions > button { flex: 1; min-width: 0; min-height: 48px; }
 .secondary { border: 1px solid var(--green); border-radius: 12px; background: white; color: var(--green); }
+
+.space-layout { margin: 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+.space-layout h2 { margin-bottom: 8px; }
+.space-layout > p { margin-top: 8px; font-size: .85rem; }
+.space-photo-canvas { position: relative; width: 100%; }
+.space-photo { display: block; width: 100%; height: auto; }
+.space-photo-marker { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; padding: 4px; max-width: 130px; border: 0; background: transparent; font-size: .85rem; font-weight: 700; text-shadow: 0 0 3px white, 0 0 6px white; touch-action: none; }
+.space-photo-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--green); color: white; border: 2px solid white; font-size: 24px; text-shadow: none; }

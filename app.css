@@ -86,6 +86,13 @@ dialog::backdrop { background: #172c20a0; }
 .interactive-plan svg { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: manipulation; }
 .interactive-plan.single-plan { max-width: 420px; margin-inline: auto; }
 .storage-marker { cursor: pointer; }
+.storage-marker { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.storage-marker.adjusting { cursor: grab; }
+.storage-marker.adjusting circle { stroke: #efaa35; stroke-width: 5; stroke-dasharray: 5 3; }
+.marker-tools { position: fixed; inset: auto 16px calc(80px + env(safe-area-inset-bottom)); max-width: 640px; margin-inline: auto; z-index: 4; padding: 12px; border: 2px solid #dca33a; border-radius: 14px; background: #fff9e8; box-shadow: 0 4px 12px #20382b22; }
+.marker-tools p { margin-bottom: 8px; }
+.marker-tools button { margin-right: 4px; }
+.marker-size { display: inline-block; min-width: 48px; text-align: center; }
 .storage-marker circle { fill: #244d38; stroke: white; stroke-width: 3; }
 .storage-marker path { fill: none; stroke: white; stroke-width: 2; }
 .storage-marker text { fill: #183d2a; font-size: 17px; font-weight: 700; paint-order: stroke; stroke: white; stroke-width: 5px; stroke-linejoin: round; }

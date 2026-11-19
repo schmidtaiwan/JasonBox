@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 7;
+const PAGE_BUILD = 8;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -97,6 +97,8 @@ function button(content, className, action) {
 }
 
 function navigate(entry) {
+  if (adjustingSave) return;
+  planAdjustment = null;
   current = entry;
   $("search").value = "";
   render();

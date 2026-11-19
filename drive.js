@@ -91,7 +91,8 @@ const drive = (() => {
       createdAt: file.createdTime,
       updatedAt: file.appProperties?.updatedAt || file.modifiedTime,
       x: file.appProperties?.x === undefined ? undefined : Number(file.appProperties.x),
-      y: file.appProperties?.y === undefined ? undefined : Number(file.appProperties.y)
+      y: file.appProperties?.y === undefined ? undefined : Number(file.appProperties.y),
+      scale: Number(file.appProperties?.scale) || 1
     };
   }
 
@@ -143,6 +144,7 @@ const drive = (() => {
     if (Number.isFinite(record.x) && Number.isFinite(record.y)) {
       metadata.appProperties.x = String(record.x);
       metadata.appProperties.y = String(record.y);
+      metadata.appProperties.scale = String(Math.min(2.5, Math.max(.5, Number(record.scale) || 1)));
     }
     if (!id) {
       const parentId = parent ?? root;

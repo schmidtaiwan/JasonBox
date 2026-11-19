@@ -121,3 +121,12 @@ dialog::backdrop { background: #172c20a0; }
   .interactive-plan:not(.single-plan) { overflow-x: auto; }
   .interactive-plan:not(.single-plan) svg { width: 1000px; max-width: none; }
 }
+
+.path-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 12px 0 8px; }
+.path-toolbar nav { margin: 0; }
+.view-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.view-switch button { min-height: 44px; padding: 6px 12px; border: 0; background: #fffefa; }
+.view-switch button[aria-pressed="true"] { background: var(--green); color: white; }
+.compact-list .thumb, .compact-list .card-main small { display: none; }
+.compact-list .card-main { min-height: 48px; padding: 10px 12px; }
+.compact-list .card { border-radius: 10px; }

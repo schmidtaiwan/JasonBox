@@ -56,6 +56,14 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await run('refresh()'); await run('refresh()');
   assert.equal(records.length, 4, 'no duplicate floors on reload');
   assert.equal(get('add').hidden, true);
+  get('view-list').onclick();
+  assert.equal(get('list').className, 'compact-list');
+  assert.equal(get('view-list').attrs['aria-pressed'], 'true');
+  await run('refresh()');
+  assert.equal(get('list').className, 'compact-list', 'refresh preserves selected display mode');
+  get('view-details').onclick();
+  assert.equal(get('list').className, '');
+  assert.equal(get('view-details').attrs['aria-pressed'], 'true');
   get('floor-image').children[0].onclick({ clientX: 570, clientY: 240 });
   assert.equal(run('draft.parent'), records[1].id);
   assert.equal(run('draft.x'), 570 / 1672);

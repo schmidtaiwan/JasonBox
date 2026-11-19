@@ -1,11 +1,20 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 11;
+const PAGE_BUILD = 12;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
 const updateDialog = $("update-dialog");
+let displayMode = "details";
+try { if (localStorage.getItem("jasonbox-display-mode") === "list") displayMode = "list"; } catch {}
+function setDisplayMode(mode) {
+  displayMode = mode;
+  try { localStorage.setItem("jasonbox-display-mode", mode); } catch {}
+  render();
+}
+$("view-list").onclick = () => setDisplayMode("list");
+$("view-details").onclick = () => setDisplayMode("details");
 let entries = [];
 let current = null;
 let draft;
@@ -120,7 +129,7 @@ function card(entry, searching) {
   const arrow = element("span", "›");
   arrow.setAttribute("aria-hidden", "true");
   open.append(thumb, description, arrow);
-  if (entry.hasPhoto) {
+  if (entry.hasPhoto && displayMode === "details") {
     thumb.dataset.id = entry.id;
     thumbnails.observe(thumb);
   }
@@ -135,6 +144,9 @@ function card(entry, searching) {
 }
 
 function render() {
+  $("list").className = displayMode === "list" ? "compact-list" : "";
+  $("view-list").setAttribute("aria-pressed", String(displayMode === "list"));
+  $("view-details").setAttribute("aria-pressed", String(displayMode === "details"));
   thumbnails.disconnect();
   objectUrls.forEach(url => URL.revokeObjectURL(url));
   objectUrls = [];

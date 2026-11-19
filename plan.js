@@ -30,7 +30,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 20, 20, bounds[2] - bounds[0] + 40, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "點選平面圖新增存放空間", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=4", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=5", width: 1672, height: 941 }));
   const addAt = (x, y) => {
     const index = planBounds.findIndex(([left, top, right, bottom]) => x >= left && x <= right && y >= top && y <= bottom);
     if (index < 0) return;

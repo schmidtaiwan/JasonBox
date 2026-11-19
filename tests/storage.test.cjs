@@ -283,13 +283,15 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const photoViewport = get('space-layout').children.find(node => node.className === 'space-photo-viewport');
   const photoCanvas = photoViewport.children[0];
   const handle = get('space-layout').children.find(node => node.className === 'space-photo-resize');
+  Object.assign(photoCanvas.children[0], { naturalWidth: 800, naturalHeight: 400 });
   handle.onpointerdown({ pointerId: 1, button: 0, clientY: 300 });
   handle.onpointermove({ pointerId: 1, clientY: 450 });
   assert.equal(photoViewport.style.height, '450px');
+  assert.equal(photoCanvas.style.minWidth, '900px', 'photo grows with the frame while keeping its aspect ratio');
   handle.onpointermove({ pointerId: 1, clientY: 240 });
   assert.equal(photoViewport.style.height, '240px');
   handle.onlostpointercapture({ pointerId: 1 });
-  assert.equal(photoCanvas.style.width, undefined, 'dragging changes only the frame height');
+  assert.equal(photoCanvas.style.minWidth, '480px', 'the photo grows or shrinks with the frame in either direction');
   assert.ok(photoCanvas);
   assert.equal(photoCanvas.onclick, undefined, 'blank photo does not create positions');
   get('add').onclick();

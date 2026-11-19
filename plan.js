@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=49", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=50", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -247,7 +247,7 @@ function markerTone(pixels) {
   return average + .05 >= .0525 / (average + .05) ? "dark" : "light";
 }
 let spaceLayoutGeneration = 0;
-function addResizableSpacePhoto(host, canvas, spaceId) {
+function addResizableSpacePhoto(host, canvas, image, spaceId) {
   const key = "jasonbox-space-photo-height:" + spaceId;
   const minimum = 120;
   const maximum = 1800;
@@ -261,11 +261,16 @@ function addResizableSpacePhoto(host, canvas, spaceId) {
   handle.setAttribute("aria-valuemax", String(maximum));
   let height;
   let drag;
+  const fitPhoto = () => {
+    if (!height || !image.naturalWidth || !image.naturalHeight) return;
+    canvas.style.minWidth = Math.ceil(height * image.naturalWidth / image.naturalHeight) + "px";
+  };
   const resize = value => {
     height = Math.min(maximum, Math.max(minimum, Math.round(value)));
     viewport.style.maxHeight = "none";
     viewport.style.height = height + "px";
     handle.setAttribute("aria-valuenow", String(height));
+    fitPhoto();
   };
   const save = () => {
     if (!height) return;
@@ -296,6 +301,7 @@ function addResizableSpacePhoto(host, canvas, spaceId) {
   };
   viewport.append(canvas);
   host.append(viewport, handle);
+  return fitPhoto;
 }
 
 function renderSpaceLayout(query) {
@@ -318,7 +324,7 @@ function renderSpaceLayout(query) {
   const image = element("img", "", "space-photo");
   image.alt = space.name + "的照片";
   canvas.append(image);
-  addResizableSpacePhoto(host, canvas, space.id);
+  const fitPhoto = addResizableSpacePhoto(host, canvas, image, space.id);
   if (space.spaceAlbum) {
     const gallery = element("div", "", "batch-preview");
     host.append(gallery);
@@ -352,6 +358,7 @@ function renderSpaceLayout(query) {
   };
   image.onload = () => {
     if (generation !== spaceLayoutGeneration) return;
+    fitPhoto();
     try {
       const sample = document.createElement("canvas");
       const scale = Math.min(256 / image.naturalWidth, 256 / image.naturalHeight);

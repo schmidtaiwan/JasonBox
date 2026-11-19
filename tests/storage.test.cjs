@@ -4,6 +4,38 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 
+test('PDF export includes cover and album photos within scope even when there are no items', async () => {
+  const floor = { id: 'floor', level: 0, name: '1F' };
+  const space = { id: 'space', parent: 'floor', level: 1, name: '櫃子', photoId: 'cover', hasPhoto: true, spaceAlbum: true };
+  const other = { id: 'other', parent: 'floor', level: 1, name: '別的空間', photoId: 'other-cover', hasPhoto: true };
+  const fetched = [];
+  let html;
+  let printed = false;
+  const nodes = new Map();
+  const get = id => {
+    if (!nodes.has(id)) nodes.set(id, {});
+    return nodes.get(id);
+  };
+  const popup = {
+    document: { write(value) { html = value; }, open() {}, close() {}, getElementById: get, images: [], fonts: { ready: Promise.resolve() } },
+    closed: false, focus() {}, print() { printed = true; }, addEventListener() {}
+  };
+  const context = {
+    current: space, entries: [floor, space, other], ancestors: entry => [floor, entry], $: get, Date, formatTime: () => '台北時間',
+    window: { open: () => popup }, URL: { createObjectURL: blob => 'blob:' + blob },
+    drive: { spacePhotos: async () => [{ id: 'side', name: '側面.jpg' }], photo: async id => { fetched.push(id); return id; } }
+  };
+  const source = fs.readFileSync(path.join(__dirname, '..', 'export.js'), 'utf8');
+  await vm.runInNewContext(source + '\nexportPdf()', context);
+  assert.deepEqual(fetched, ['cover', 'side']);
+  assert.match(html, /空間照片/);
+  assert.match(html, /1F \/ 櫃子/);
+  assert.match(html, /blob:cover/);
+  assert.match(html, /blob:side/);
+  assert.doesNotMatch(html, /別的空間/);
+  assert.equal(printed, true);
+});
+
 class Node {
   constructor() { this.value = ''; this.children = []; this.open = false; this.style = {}; this.attrs = {}; }
   append(...nodes) { this.children.push(...nodes); }

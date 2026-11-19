@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 14;
+const PAGE_BUILD = 15;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -401,7 +401,7 @@ function formatStorage(bytes) {
   if (!Number.isFinite(value) || value < 0) return "未知";
   const units = ["B", "KB", "MB", "GB", "TB"];
   const index = value ? Math.min(4, Math.floor(Math.log(value) / Math.log(1024))) : 0;
-  return (value / 1024 ** index).toLocaleString("zh-TW", { maximumFractionDigits: 2 }) + " " + units[index];
+  return (value / 1024 ** index).toLocaleString("zh-TW", { maximumFractionDigits: 1 }) + units[index];
 }
 
 async function refreshQuota() {
@@ -412,8 +412,8 @@ async function refreshQuota() {
     const quota = await drive.quota();
     if (generation !== quotaGeneration) return;
     const limit = Number(quota.limit);
-    $("drive-quota").textContent = "雲端容量：已用 " + formatStorage(quota.usage) +
-      (Number.isFinite(limit) && limit > 0 ? "／" + formatStorage(limit) + "，剩餘 " + formatStorage(Math.max(0, limit - Number(quota.usage))) : "（未提供容量上限）");
+    $("drive-quota").textContent = formatStorage(quota.usage) +
+      (Number.isFinite(limit) && limit > 0 ? "/" + formatStorage(limit) : "/未知");
     $("drive-quota").title = "目前登入帳號的 Google 儲存空間，包含雲端硬碟、Gmail 與 Google 相簿。";
   } catch {
     if (generation !== quotaGeneration) return;
@@ -433,6 +433,7 @@ function setSignedIn(signedIn) {
   $("account-menu").open = false;
   quotaGeneration++;
   $("drive-quota").textContent = "";
+  $("retry-quota").hidden = true;
   $("account-email").textContent = "";
   const avatar = $("account-avatar");
   avatar.hidden = true;

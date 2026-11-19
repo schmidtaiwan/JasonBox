@@ -137,3 +137,7 @@ dialog::backdrop { background: #172c20a0; }
 .photo-list-item .thumb { display: grid; width: 100%; height: auto; aspect-ratio: 1; flex: none; object-fit: contain; }
 .photo-list-name { overflow-wrap: anywhere; line-height: 1.5; }
 .photo-list-gallery > p { grid-column: 1 / -1; padding: 12px; }
+
+#header-storage { display: none !important; }
+.brand-name #retry-quota { padding: 0; min-height: 32px; font-size: .75rem; }
+.floor-tab { width: 50px; flex: 0 0 50px; padding-inline: 0; }

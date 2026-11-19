@@ -147,7 +147,9 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(get('header-storage').hidden, false);
   assert.equal(get('account-email').textContent, 'test@example.com');
   assert.equal(get('account-avatar').hidden, false);
-  assert.match(get('drive-quota').textContent, /1 GB.*15 GB.*14 GB/);
+  assert.equal(get('drive-quota').textContent, '1GB/15GB');
+  assert.equal(run('formatStorage(71932314)'), '68.6MB');
+  assert.equal(get('floor-tabs').children[4].textContent, 'ALL');
   get('account-avatar').onerror();
   assert.equal(get('avatar-fallback').hidden, false);
   context.drive.quota = async () => { throw new Error('offline'); };

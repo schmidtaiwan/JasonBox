@@ -167,7 +167,7 @@ function svgNode(tag, attrs = {}) {
 }
 
 function renderFloorPlans(query) {
-  $("floor-plans").hidden = Boolean(query);
+  $("floor-plans").hidden = Boolean(query) || Boolean(current && current.level > 0);
   const floor = ancestors(current).find(entry => entry.level === 0);
   const number = floor ? floorNumber(floor.name) : null;
   const host = $("floor-image");
@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "點選平面圖新增存放空間", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=19", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=20", width: 1672, height: 941 }));
   const addAt = (x, y) => {
     if (planAdjustment || adjustingSave) return;
     const index = planBounds.findIndex(([left, top, right, bottom]) => x >= left && x <= right && y >= top && y <= bottom);

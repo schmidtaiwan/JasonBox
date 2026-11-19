@@ -56,7 +56,8 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const run = code => vm.runInContext(code, context);
   await run('refresh()'); await run('refresh()');
   assert.equal(records.length, 4, 'no duplicate floors on reload');
-  assert.equal(get('add').hidden, true);
+  assert.equal(get('add').hidden, false);
+  assert.equal(get('add').disabled, true);
   get('view-list').onclick();
   assert.equal(get('list').className, 'compact-list');
   assert.equal(get('view-list').attrs['aria-pressed'], 'true');
@@ -113,6 +114,17 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   marker = get('floor-image').children[0].children.find(n => n.attrs.role === 'button');
   marker.onclick({ stopPropagation() {} });
   assert.equal(run('current.id'), storage.id);
+  assert.equal(get('floor-plans').hidden, true, 'cabinet opens a content screen');
+  run('setSignedIn(true)');
+  assert.equal(get('footer').hidden, false);
+  assert.equal(get('add').disabled, false);
+  get('back').onclick();
+  assert.equal(run('current'), null);
+  assert.equal(get('floor-plans').hidden, false, 'back restores floor layout');
+  assert.equal(get('footer').hidden, false, 'footer stays pinned on floor screen');
+  assert.equal(get('add').disabled, true);
+  run('navigate(entries.find(e => e.name === "床底下"))');
+
   get('add').onclick();
   assert.equal(run('draft.level'), 4, 'items live directly under a marked space');
   assert.equal(run('draft.parent'), storage.id);

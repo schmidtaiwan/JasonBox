@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 19;
+const PAGE_BUILD = 20;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -17,6 +17,8 @@ $("view-list").onclick = () => setDisplayMode("list");
 $("view-details").onclick = () => setDisplayMode("details");
 let entries = [];
 let current = null;
+let signedIn = false;
+let navigationHistory = [];
 let draft;
 let objectUrls = [];
 let previewUrl;
@@ -106,9 +108,10 @@ function button(content, className, action) {
   return node;
 }
 
-function navigate(entry) {
+function navigate(entry, remember = true) {
   if (adjustingSave) return;
   planAdjustment = null;
+  if (remember && current?.id !== entry?.id) navigationHistory.push(current?.id ?? null);
   current = entry;
   $("search").value = "";
   render();
@@ -279,9 +282,12 @@ function render() {
       entries.filter(entry => entry.level === 4).length + " 件物品";
   $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "內部位置與物品";
   $("count").textContent = visible.length + (depth === 4 && !query ? " 件" : " 筆");
-  $("add").textContent = "＋ 新增存放物品";
-  $("add").hidden = !current || current.level === 0 || Boolean(query);
-  document.querySelector("footer").hidden = $("add").hidden;
+  $("add").textContent = "加入";
+  $("add").hidden = false;
+  $("add").disabled = !signedIn || !current || current.level === 0;
+  $("add").title = current && current.level > 0 ? "新增存放物品" : "請先進入櫃子或內部位置";
+  $("back").disabled = !signedIn || (!current && !navigationHistory.length && !query);
+  document.querySelector("footer").hidden = !signedIn;
   $("add-position").hidden = !current || current.level < 1 || current.level >= 3 || Boolean(query);
   $("edit-space").hidden = !current || current.level === 0;
   $("edit-space").onclick = () => edit(current);
@@ -404,7 +410,12 @@ $("remove-photo").onclick = () => {
   showPhoto();
 };
 $("search").oninput = render;
-$("add").onclick = () => edit();
+$("add").onclick = () => { if (current && current.level > 0) edit(); };
+$("back").onclick = () => {
+  if (adjustingSave) return;
+  const previous = navigationHistory.length ? navigationHistory.pop() : current?.parent;
+  navigate(entries.find(entry => entry.id === previous) || null, false);
+};
 $("add-position").onclick = () => {
   if (!current || current.level < 1 || current.level >= 3) return;
   edit(null, { level: current.level + 1, parent: current.id, positionType: "區" });
@@ -529,12 +540,14 @@ async function refreshQuota() {
   }
 }
 
-function setSignedIn(signedIn) {
+function setSignedIn(value) {
+  signedIn = value;
   document.querySelector("main").hidden = !signedIn;
-  document.querySelector("footer").hidden = !signedIn || $("add").hidden;
+  document.querySelector("footer").hidden = !signedIn;
   $("gate").hidden = signedIn;
   $("logout").hidden = !signedIn;
-  $("add").disabled = !signedIn;
+  $("add").disabled = !signedIn || !current || current.level === 0;
+  $("back").disabled = !signedIn || (!current && !navigationHistory.length);
   $("header-storage").hidden = !signedIn;
   $("account-menu").hidden = !signedIn;
   $("account-menu").open = false;
@@ -571,7 +584,8 @@ function signOut(message = "") {
   if (editor.open) closeEditor();
   drive.logout();
   entries = [];
-  navigate(null);
+  navigate(null, false);
+  navigationHistory = [];
   setSignedIn(false);
   $("login-status").textContent = message;
 }

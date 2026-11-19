@@ -121,6 +121,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   get('back').onclick();
   assert.equal(run('current'), null);
   assert.equal(get('floor-plans').hidden, false, 'back restores floor layout');
+  assert.deepEqual(context.window.lastScroll, [0, 420], 'back restores the scroll position saved before opening cabinet');
   assert.equal(get('footer').hidden, false, 'footer stays pinned on floor screen');
   assert.equal(get('add').disabled, true);
   run('navigate(entries.find(e => e.name === "床底下"))');

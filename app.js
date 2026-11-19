@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 20;
+const PAGE_BUILD = 21;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -111,7 +111,7 @@ function button(content, className, action) {
 function navigate(entry, remember = true) {
   if (adjustingSave) return;
   planAdjustment = null;
-  if (remember && current?.id !== entry?.id) navigationHistory.push(current?.id ?? null);
+  if (remember && current?.id !== entry?.id) navigationHistory.push({ id: current?.id ?? null, x: window.scrollX, y: window.scrollY, query: $("search").value });
   current = entry;
   $("search").value = "";
   render();
@@ -413,8 +413,11 @@ $("search").oninput = render;
 $("add").onclick = () => { if (current && current.level > 0) edit(); };
 $("back").onclick = () => {
   if (adjustingSave) return;
-  const previous = navigationHistory.length ? navigationHistory.pop() : current?.parent;
-  navigate(entries.find(entry => entry.id === previous) || null, false);
+  const previous = navigationHistory.length ? navigationHistory.pop() : { id: current?.parent, x: 0, y: 0, query: "" };
+  navigate(entries.find(entry => entry.id === previous.id) || null, false);
+  $("search").value = previous.query || "";
+  render();
+  window.scrollTo(previous.x, previous.y);
 };
 $("add-position").onclick = () => {
   if (!current || current.level < 1 || current.level >= 3) return;

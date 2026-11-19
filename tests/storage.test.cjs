@@ -322,12 +322,20 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const moved = run('photoPoint(combinePhotoTransforms([2,0,0,2,-.5,-.5],[0,1,-1,0,1,0]), .5, .25)');
   assert.deepEqual(Array.from(moved), [1, .5], 'rotation and crop preserve relative marker location');
   records.push({ id: 'left', level: 2, name: '左', parent: storage.id }, { id: 'right', level: 2, name: '右', parent: storage.id });
+  records.push({ id: 'left-child', level: 3, name: '下層', parent: 'left' });
   for (const id of ['move-a', 'move-b', 'stay']) records.push({ id, level: 4, name: id, parent: 'left' });
   context.drive.moveItem = async (entry, target) => realSave({ ...entry, parent: target.id });
   await run('refresh();');
   run('navigate(entries.find(e => e.id === "left"))');
   assert.equal(get('move-items').hidden, false);
   get('move-items').onclick();
+  const targets = get('move-target').children;
+  assert.ok(targets.some(option => option.value === storage.id && option.textContent.startsWith('上一層')));
+  assert.ok(targets.some(option => option.value === 'right' && option.textContent.startsWith('同層')));
+  assert.ok(targets.some(option => option.value === 'left-child' && option.textContent.startsWith('下一層')));
+  assert.equal(run('spaceAppearance({hasPhoto:true}).icon[0]'), 'photo-only');
+  assert.equal(run('spaceAppearance({hasPhoto:true,iconKey:"bed"}).icon[0]'), 'bed');
+  assert.equal(run('spaceAppearance({hasPhoto:false}).icon[0]'), 'cabinet');
   for (const id of ['move-a', 'move-b']) {
     const checkbox = get('move-list').children.find(row => row.children[1].textContent === id).children[0];
     checkbox.checked = true;

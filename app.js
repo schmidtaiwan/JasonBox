@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 40;
+const PAGE_BUILD = 41;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -342,8 +342,11 @@ function movableItems(source) {
 }
 
 function moveTargets(source) {
-  return source?.level > 0 ? entries.filter(space => space.id !== source.id && space.level === source.level &&
-    space.parent === source.parent && !photoUploads.has(space.id)) : [];
+  if (!source || source.level === 0) return [];
+  return entries.filter(space => space.level > 0 && space.level < 4 && space.id !== source.id &&
+    !photoUploads.has(space.id) && (space.id === source.parent || space.parent === source.id ||
+      (space.level === source.level && space.parent === source.parent)))
+    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, "zh-Hant", { numeric: true }));
 }
 
 const moveDialog = $("move-dialog");
@@ -381,10 +384,11 @@ $("move-items").onclick = () => {
   moveSelection = { source: current, selected: new Set() };
   $("move-source").textContent = "來源：" + ancestors(current).map(space => space.name).join(" / ");
   $("move-status").textContent = "";
-  const placeholder = element("option", "選擇同一上層的區域");
+  const placeholder = element("option", "選擇目的地");
   placeholder.value = "";
   $("move-target").replaceChildren(placeholder, ...targets.map(space => {
-    const option = element("option", space.name);
+    const relation = space.id === current.parent ? "上一層" : space.parent === current.id ? "下一層" : "同層";
+    const option = element("option", relation + " · " + space.name);
     option.value = space.id;
     return option;
   }));

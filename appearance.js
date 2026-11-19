@@ -16,14 +16,16 @@ const spaceColors = [
   ["橘色", "#b85208"], ["金棕色", "#8a6500"], ["青綠色", "#087b7b"], ["深灰色", "#444444"]
 ];
 function spaceAppearance(entry) {
-  const key = entry.iconKey === "photo-only" && !entry.hasPhoto && !entry.photo ? "cabinet" : entry.iconKey;
+  const hasPhoto = entry.hasPhoto || entry.photo;
+  const key = entry.iconKey === "photo-only" && !hasPhoto ? "cabinet"
+    : entry.iconKey || (hasPhoto ? "photo-only" : "cabinet");
   return {
     icon: spaceIcons.find(icon => icon[0] === key) || spaceIcons[0],
     color: spaceColors.some(color => color[1] === entry.iconColor) ? entry.iconColor : spaceColors[0][1]
   };
 }
 const iconPhotoCache = new Map();
-function addPhotoThumbnail(svg, entry, size) {
+function addPhotoThumbnail(svg, entry, size, transparent = false) {
   if (!entry.hasPhoto && !entry.photo) return;
   const key = (entry.photoId || entry.id) + ":" + entry.updatedAt;
   let pending = entry.photo ? Promise.resolve(entry.photo) : iconPhotoCache.get(key);
@@ -37,14 +39,14 @@ function addPhotoThumbnail(svg, entry, size) {
     if (!svg.isConnected) return;
     const url = URL.createObjectURL(blob);
     objectUrls.push(url);
-    svg.append(svgNode("image", { href: url, x: -size / 2, y: -size / 2, width: size, height: size, preserveAspectRatio: entry.iconKey === "photo-only" ? "xMidYMid meet" : "xMidYMid slice", "pointer-events": "none" }));
+    svg.append(svgNode("image", { href: url, x: -size / 2, y: -size / 2, width: size, height: size, preserveAspectRatio: transparent ? "xMidYMid meet" : "xMidYMid slice", "pointer-events": "none" }));
   }).catch(() => {});
 }
 function spaceIconNode(entry) {
   const appearance = spaceAppearance(entry);
   const svg = svgNode("svg", { viewBox: "-24 -24 48 48", "aria-hidden": "true", class: "space-choice-icon" });
   if (appearance.icon[0] === "photo-only") {
-    addPhotoThumbnail(svg, entry, 44);
+    addPhotoThumbnail(svg, entry, 44, true);
     return svg;
   }
   svg.append(svgNode("circle", { r: 22, fill: appearance.color }),

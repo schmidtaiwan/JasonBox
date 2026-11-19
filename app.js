@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 39;
+const PAGE_BUILD = 40;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -326,6 +326,7 @@ function render() {
   $("back").disabled = !signedIn || (!current && !navigationHistory.length && !query);
   document.querySelector("footer").hidden = !signedIn;
   $("edit-space").hidden = !current || current.level === 0;
+  $("move-items").hidden = !signedIn || Boolean(query) || !movableItems(current).length || !moveTargets(current).length;
   $("edit-space").onclick = () => edit(current);
   $("list").replaceChildren(...visible.map(entry => card(entry, Boolean(query))));
   if (!visible.length) {
@@ -335,6 +336,103 @@ function render() {
     $("list").append(element("p", message, "empty"));
   }
 }
+
+function movableItems(source) {
+  return source?.level > 0 ? entries.filter(item => item.level === 4 && item.parent === source.id && !photoUploads.has(item.id)) : [];
+}
+
+function moveTargets(source) {
+  return source?.level > 0 ? entries.filter(space => space.id !== source.id && space.level === source.level &&
+    space.parent === source.parent && !photoUploads.has(space.id)) : [];
+}
+
+const moveDialog = $("move-dialog");
+let moveSelection;
+let movingItems = false;
+
+function updateMoveControls() {
+  $("move-confirm").disabled = movingItems || !moveSelection?.selected.size || !$("move-target").value;
+  $("move-close").disabled = movingItems;
+  $("move-options").disabled = movingItems;
+  $("move-target").disabled = movingItems;
+}
+
+function renderMoveOptions() {
+  const { source, selected } = moveSelection;
+  $("move-list").replaceChildren(...movableItems(source).map(item => {
+    const label = element("label", "");
+    const checkbox = element("input", "");
+    checkbox.type = "checkbox";
+    checkbox.checked = selected.has(item.id);
+    checkbox.onchange = () => {
+      if (checkbox.checked) selected.add(item.id);
+      else selected.delete(item.id);
+      updateMoveControls();
+    };
+    label.append(checkbox, element("span", item.name));
+    return label;
+  }));
+  updateMoveControls();
+}
+
+$("move-items").onclick = () => {
+  const targets = moveTargets(current);
+  if (!targets.length || !movableItems(current).length) return;
+  moveSelection = { source: current, selected: new Set() };
+  $("move-source").textContent = "來源：" + ancestors(current).map(space => space.name).join(" / ");
+  $("move-status").textContent = "";
+  const placeholder = element("option", "選擇同一上層的區域");
+  placeholder.value = "";
+  $("move-target").replaceChildren(placeholder, ...targets.map(space => {
+    const option = element("option", space.name);
+    option.value = space.id;
+    return option;
+  }));
+  $("move-target").value = "";
+  renderMoveOptions();
+  moveDialog.showModal();
+};
+$("move-target").onchange = updateMoveControls;
+$("move-close").onclick = () => { if (!movingItems) moveDialog.close(); };
+moveDialog.oncancel = event => { if (movingItems) event.preventDefault(); };
+$("move-form").onsubmit = async event => {
+  event.preventDefault();
+  if (movingItems || !moveSelection) return;
+  const { source, selected } = moveSelection;
+  const target = moveTargets(source).find(space => space.id === $("move-target").value);
+  const batch = movableItems(source).filter(item => selected.has(item.id));
+  if (!target || !batch.length) return;
+  movingItems = true;
+  updateMoveControls();
+  $("move-status").textContent = "正在移動 " + batch.length + " 件物品…";
+  const errors = [];
+  let moved = 0;
+  try {
+    for (const item of batch) {
+      try {
+        const saved = await drive.moveItem(item, target);
+        entries = entries.map(entry => entry.id === item.id ? saved : entry);
+        selected.delete(item.id);
+        moved++;
+      } catch (error) {
+        errors.push(error.message);
+        if (error instanceof drive.SessionExpired) break;
+      }
+    }
+    if (moved) await Promise.all([touchParent(source.id), touchParent(target.id)]);
+    render();
+    if (errors.length) {
+      $("move-status").textContent = "已移動 " + moved + " 件，尚有 " + (batch.length - moved) + " 件未確認：" + errors[0];
+      renderMoveOptions();
+    } else {
+      moveDialog.close();
+      $("mutation-status").textContent = "已將 " + moved + " 件物品移到「" + target.name + "」。";
+    }
+  } finally {
+    movingItems = false;
+    updateMoveControls();
+  }
+};
 
 function edit(entry, placement) {
   if (entry && photoUploads.has(entry.id)) {

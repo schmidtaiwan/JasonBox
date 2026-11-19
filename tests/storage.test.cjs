@@ -321,6 +321,24 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   for (const name of ['圍巾', '帽子', '手套', '雨傘']) assert.ok(records.some(record => record.name === name));
   const moved = run('photoPoint(combinePhotoTransforms([2,0,0,2,-.5,-.5],[0,1,-1,0,1,0]), .5, .25)');
   assert.deepEqual(Array.from(moved), [1, .5], 'rotation and crop preserve relative marker location');
+  records.push({ id: 'left', level: 2, name: '左', parent: storage.id }, { id: 'right', level: 2, name: '右', parent: storage.id });
+  for (const id of ['move-a', 'move-b', 'stay']) records.push({ id, level: 4, name: id, parent: 'left' });
+  context.drive.moveItem = async (entry, target) => realSave({ ...entry, parent: target.id });
+  await run('refresh();');
+  run('navigate(entries.find(e => e.id === "left"))');
+  assert.equal(get('move-items').hidden, false);
+  get('move-items').onclick();
+  for (const id of ['move-a', 'move-b']) {
+    const checkbox = get('move-list').children.find(row => row.children[1].textContent === id).children[0];
+    checkbox.checked = true;
+    checkbox.onchange();
+  }
+  get('move-target').value = 'right';
+  get('move-target').onchange();
+  await get('move-form').onsubmit({ preventDefault() {} });
+  assert.equal(get('move-dialog').open, false);
+  assert.deepEqual(records.filter(record => record.parent === 'right').map(record => record.id).sort(), ['move-a', 'move-b']);
+  assert.equal(records.find(record => record.id === 'stay').parent, 'left');
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {
@@ -349,6 +367,10 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
       const previous = files.get(id);
       const saved = { ...(previous || { id: 'new-' + ++count, createdTime: '2026-11-19T00:00:00Z' }), ...metadata,
         appProperties: { ...previous?.appProperties, ...metadata.appProperties }, modifiedTime: new Date().toISOString() };
+      if (parsed.searchParams.has('addParents')) {
+        saved.parents = previous.parents.filter(parent => parent !== parsed.searchParams.get('removeParents'));
+        saved.parents.push(parsed.searchParams.get('addParents'));
+      }
       files.set(saved.id, saved);
       return Response.json(saved);
     }
@@ -420,6 +442,14 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   const rotated = await run('drive.save({...photoSpace, photo:new Blob(["rotated"]), replaceCover:true, coverTransform:[0,1,-1,0,1,0]})');
   assert.equal(rotated.photoId, photoSpace.photoId);
   assert.deepEqual(Array.from(rotated.coverTransform), [0, 1, -1, 0, 1, 0]);
+  const original = (await run('drive.readEntries()')).find(entry => entry.id === 'direct');
+  context.moveOriginal = original;
+  const moved = await run('drive.moveItem(moveOriginal, {id:"cabinet"})');
+  assert.equal(moved.id, original.id);
+  assert.equal(moved.parent, 'cabinet');
+  assert.equal(moved.hasPhoto, true);
+  const retried = await run('drive.moveItem(moveOriginal, {id:"cabinet"})');
+  assert.equal(retried.parent, 'cabinet');
 
   const quota = await run('drive.quota()');
   assert.equal(quota.usage, '1024');

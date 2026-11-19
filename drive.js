@@ -137,10 +137,11 @@ const drive = (() => {
     return entries.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant", { numeric: true }));
   }
 
-  async function write(metadata, id, content, contentType) {
+  async function write(metadata, id, content, contentType, parentMove) {
     const path = id ? "/" + encodeURIComponent(id) : "";
     const options = { method: id ? "PATCH" : "POST" };
     let url = filesUrl + path + "?fields=" + encodeURIComponent(fields);
+    if (parentMove) url += "&" + new URLSearchParams(parentMove);
     if (content) {
       const boundary = "jasonbox-" + crypto.randomUUID();
       url = uploadUrl + path + "?uploadType=multipart&fields=" + encodeURIComponent(fields);
@@ -157,6 +158,20 @@ const drive = (() => {
       options.body = JSON.stringify(metadata);
     }
     return (await request(url, options)).json();
+  }
+
+  async function moveItem(item, destination) {
+    const path = filesUrl + "/" + encodeURIComponent(item.id);
+    const file = await (await request(path + "?fields=" + fields + ",trashed")).json();
+    if (file.trashed || file.appProperties?.jasonBoxItem !== "1") throw new Error("找不到這個物品。");
+    if (file.parents.includes(destination.id)) return entryFromFile(file, 4);
+    if (!file.parents.includes(item.parent)) throw new Error("物品的位置已變更，請重新整理。");
+    const target = await (await request(filesUrl + "/" + encodeURIComponent(destination.id) + "?fields=mimeType,trashed")).json();
+    if (target.trashed || target.mimeType !== folder) throw new Error("目的地已不存在。");
+    const saved = await write({
+      appProperties: { updatedAt: new Date().toISOString(), updatedBy: accountInfo?.email || "未記錄" }
+    }, item.id, undefined, undefined, { addParents: destination.id, removeParents: item.parent });
+    return entryFromFile(saved, 4);
   }
 
   async function save(record) {
@@ -260,5 +275,5 @@ const drive = (() => {
     return data.storageQuota;
   }
 
-  return { login, logout, readEntries, save, remove, photo, spacePhotos, touch, quota, account: () => accountInfo, SessionExpired };
+  return { login, logout, readEntries, save, moveItem, remove, photo, spacePhotos, touch, quota, account: () => accountInfo, SessionExpired };
 })();

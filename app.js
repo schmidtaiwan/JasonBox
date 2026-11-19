@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 16;
+const PAGE_BUILD = 17;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -68,7 +68,8 @@ const thumbnails = new IntersectionObserver(changes => {
 });
 
 async function refresh() {
-  entries = await drive.readEntries();
+  entries = (await drive.readEntries()).filter(entry => !photoUploads.has(entry.id));
+  entries.push(...Array.from(photoUploads.values(), job => job.local));
   for (let floor = 1; floor <= 4; floor++) {
     const existing = entries.find(entry => entry.level === 0 && floorNumber(entry.name) === floor);
     if (!existing) entries.push(await drive.save({ name: floor + "F", level: 0, parent: null }));
@@ -114,10 +115,75 @@ function navigate(entry) {
   window.scrollTo(0, 0);
 }
 
+const photoUploads = new Map();
+let uploadSequence = 0;
+
+function uploadStatus(entry) {
+  const job = photoUploads.get(entry.id);
+  return job ? job.failed ? "上傳失敗，按此重試" : "背景上傳中…" : "";
+}
+
+function openItem(entry) {
+  const job = photoUploads.get(entry.id);
+  if (job) {
+    if (job.failed) void sendPhotoUpload(job);
+    return;
+  }
+  edit(entry);
+}
+
+function displayThumbnail(placeholder, entry) {
+  if (entry.photo) {
+    const img = element("img", "", "thumb");
+    img.alt = "";
+    img.src = URL.createObjectURL(entry.photo);
+    objectUrls.push(img.src);
+    placeholder.replaceWith(img);
+  } else if (entry.hasPhoto) {
+    placeholder.dataset.id = entry.id;
+    thumbnails.observe(placeholder);
+  }
+}
+
+function queuePhotoUpload(record) {
+  const id = record.id || "pending-photo-" + ++uploadSequence;
+  const local = { ...record, id, hasPhoto: true, updatedAt: new Date().toISOString(),
+    createdAt: record.createdAt || new Date().toISOString() };
+  const job = { id, record, local, failed: false, running: false };
+  photoUploads.set(id, job);
+  entries = entries.filter(entry => entry.id !== id).concat(local);
+  closeEditor();
+  render();
+  void sendPhotoUpload(job);
+}
+
+async function sendPhotoUpload(job) {
+  if (job.running) return;
+  job.running = true;
+  job.failed = false;
+  render();
+  try {
+    const saved = await drive.save(job.record);
+    entries = entries.filter(entry => entry.id !== job.id).concat(saved);
+    photoUploads.delete(job.id);
+    await touchParent(saved.parent);
+  } catch (error) {
+    job.failed = true;
+    $("mutation-status").textContent = "照片尚未上傳：" + error.message + "。點選失敗的物品可重試。";
+  } finally {
+    job.running = false;
+    render();
+  }
+}
+
+window.addEventListener("beforeunload", event => {
+  if (photoUploads.size) { event.preventDefault(); event.returnValue = ""; }
+});
+
 function photoListCard(entry) {
   const section = element("section", "", "photo-list-section");
   const heading = element("div", "", "photo-list-heading");
-  heading.append(button(entry.name, "quiet", () => entry.level === 4 ? edit(entry) : navigate(entry)));
+  heading.append(button(entry.name, "quiet", () => entry.level === 4 ? openItem(entry) : navigate(entry)));
   if (entry.level !== 4 && entry.level !== 0) heading.append(button("編輯", "quiet", () => edit(entry)));
   section.append(heading);
   for (const child of entries.filter(item => item.parent === entry.id && item.level !== 4)) {
@@ -127,15 +193,15 @@ function photoListCard(entry) {
     item.level === 4 && ancestors(item).some(parent => parent.id === entry.id));
   const gallery = element("div", "", "photo-list-gallery");
   for (const item of items) {
-    const tile = button("", "photo-list-item", () => edit(item));
+    const tile = button("", "photo-list-item", () => openItem(item));
     tile.setAttribute("aria-label", "編輯物品：" + item.name);
     const photo = element("span", "尚無照片", "thumb");
-    if (item.hasPhoto) {
-      photo.dataset.id = item.id;
-      thumbnails.observe(photo);
-    }
+    // The local thumbnail is inserted after the tile is attached.
+
     tile.append(photo, element("span", item.name, "photo-list-name"));
     gallery.append(tile);
+    displayThumbnail(photo, item);
+    if (uploadStatus(item)) tile.append(element("small", uploadStatus(item), "upload-status"));
   }
   if (!items.length) gallery.append(element("p", "這個空間還沒有物品。", "muted"));
   section.append(gallery);
@@ -146,7 +212,7 @@ function card(entry, searching) {
   if (displayMode === "list") return photoListCard(entry);
   const row = element("div", "", "card");
   const isItem = entry.level === 4;
-  const open = button("", "card-main", () => isItem ? edit(entry) : navigate(entry));
+  const open = button("", "card-main", () => isItem ? openItem(entry) : navigate(entry));
   const children = entries.filter(child => child.parent === entry.id);
   const path = ancestors(entry).slice(0, -1).map(parent => parent.name).join(" / ");
   const description = element("span", "");
@@ -158,10 +224,8 @@ function card(entry, searching) {
   const arrow = element("span", "›");
   arrow.setAttribute("aria-hidden", "true");
   open.append(thumb, description, arrow);
-  if (entry.hasPhoto && displayMode === "details") {
-    thumb.dataset.id = entry.id;
-    thumbnails.observe(thumb);
-  }
+  if (entry.hasPhoto && displayMode === "details") displayThumbnail(thumb, entry);
+  if (uploadStatus(entry)) description.append(element("small", uploadStatus(entry), "upload-status"));
   description.append(element("small", "更動：" + formatTime(entry.updatedAt), "changed-time"));
   row.append(open);
   if (!isItem && entry.level !== 0) {
@@ -342,6 +406,10 @@ $("form").onsubmit = async event => {
   }
   const record = { ...draft, name };
   if (record.level > 1 && record.level < 4) record.positionType = $("position-type").value;
+  if (record.level === 4 && record.photo) {
+    queuePhotoUpload(record);
+    return;
+  }
   saving = true;
   busy(true);
   $("form-status").textContent = "正在儲存到 Google Drive…";
@@ -506,7 +574,13 @@ $("login").onclick = async () => {
     $("login").disabled = false;
   }
 };
-$("logout").onclick = () => signOut();
+$("logout").onclick = () => {
+  if (photoUploads.size) {
+    $("mutation-status").textContent = "照片尚未上傳完成，請等待完成或點選失敗物品重試後再登出。";
+    return;
+  }
+  signOut();
+};
 
 $("page-version").textContent = "版次 " + PAGE_BUILD + " (" + PAGE_DATE + ")";
 updateDialog.oncancel = event => event.preventDefault();

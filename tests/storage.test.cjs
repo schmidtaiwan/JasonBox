@@ -8,6 +8,7 @@ class Node {
   constructor() { this.value = ''; this.children = []; this.open = false; this.style = {}; this.attrs = {}; }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
+  replaceWith(node) { this.replacement = node; }
   setAttribute(key, value) { this.attrs[key] = value; }
   removeAttribute(key) { delete this.attrs[key]; }
   get childElementCount() { return this.children.length; }
@@ -137,7 +138,23 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await get('form').onsubmit({ preventDefault() {} });
   assert.equal(get('editor').open, true, 'empty item is rejected');
   run('draft.photo = new Blob(["test photo"], {type:"image/jpeg"})');
+  const realSave = context.drive.save;
+  let resolveUpload, rejectUpload;
+  context.drive.save = () => new Promise((resolve, reject) => { resolveUpload = resolve; rejectUpload = reject; });
   await get('form').onsubmit({ preventDefault() {} });
+  assert.equal(get('editor').open, false, 'photo editor closes before upload finishes');
+  assert.equal(run('photoUploads.size'), 1);
+  assert.ok(run('entries.some(e => e.photo && e.id.startsWith("pending-photo-"))'));
+  rejectUpload(new Error('network unavailable'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(run('Array.from(photoUploads.values())[0].failed'), true);
+  run('openItem(Array.from(photoUploads.values())[0].local)');
+  assert.equal(run('Array.from(photoUploads.values())[0].running'), true);
+  const uploaded = await realSave(run('Array.from(photoUploads.values())[0].record'));
+  resolveUpload(uploaded);
+  await new Promise(resolve => setImmediate(resolve));
+  context.drive.save = realSave;
+  assert.equal(run('photoUploads.size'), 0, 'retry replaces local photo with uploaded record');
   assert.ok(records.some(r => r.name.startsWith('物品照片 ') && r.parent === storage.id), 'photo-only item gets a readable automatic name');
   assert.equal(run('formatTime("2026-11-19T04:00:00Z")').includes('12:00:00'), true);
   run('navigate(entries.find(e => e.name === "床底下"))');

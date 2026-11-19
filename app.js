@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 43;
+const PAGE_BUILD = 44;
 const PAGE_DATE = "2026-11-19";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -475,8 +475,10 @@ function edit(entry, placement) {
     .map(parent => parent.name).join(" / ");
   $("name").value = draft.name ?? "";
   $("name").required = draft.level !== 4;
-  $("name").maxLength = !draft.id && draft.level === 4 ? 1000 : 80;
-  $("name").placeholder = draft.level === 4 ? (draft.id ? "例如 羊毛圍巾" : "例如 圍巾、帽子（以空格或逗號分隔）") : isPosition ? "例如 左區、第 2 格、上層" : "例如 櫃子、床底下";
+  $("name").maxLength = draft.id ? 80 : 1000;
+  $("name").placeholder = draft.level === 4
+    ? (draft.id ? "例如 羊毛圍巾" : "例如 圍巾、帽子（以空格或逗號分隔）")
+    : draft.id ? "例如 櫃子" : isPosition ? "例如 左區 右區 上層（空格分隔）" : "例如 櫃子 床底下（空格分隔）";
   $("entry-time").textContent = entry ? "建立：" + formatTime(entry.createdAt) + "；更動：" + changeDescription(entry) : "儲存時自動記錄建立與更動時間（台北）";
   $("remove").hidden = !entry;
   $("photos").hidden = draft.level === 0;
@@ -634,13 +636,26 @@ function closeEditor() {
   showPhoto();
   showUpdatePrompt();
 }
+function batchSpacePosition(record, parent, index, total) {
+  const columns = Math.min(3, total);
+  const rows = Math.ceil(total / columns);
+  const x = .5 + (index % columns - (columns - 1) / 2) * .24;
+  const y = .5 + (Math.floor(index / columns) - (rows - 1) / 2) * Math.min(.18, .8 / rows);
+  if (record.level === 1) {
+    const [left, top, right, bottom] = planBounds[(floorNumber(parent?.name || "") || 1) - 1];
+    return { x: (left + (right - left) * x) / 1672, y: (top + (bottom - top) * y) / 941 };
+  }
+  const [photoX, photoY] = parent?.coverTransform ? inversePhotoPoint(parent.coverTransform, x, y) : [x, y];
+  return { photoX, photoY };
+}
+
 $("form").onsubmit = async event => {
   event.preventDefault();
   if ($("save").disabled || !draft || draft.level === 0) return;
   let name = $("name").value.trim();
   const enteredName = name;
-  const names = !draft.id && draft.level === 4 ? name.split(/[\s,，、]+/u).filter(Boolean) : [];
-  if (!draft.id && draft.level === 4) name = names[0] || "";
+  const names = draft.id ? [] : name.split(draft.level === 4 ? /[\s,，、]+/u : /\s+/u).filter(Boolean);
+  if (!draft.id) name = names[0] || "";
   const photos = draft.photos || [];
   if (!name && draft.level === 4 && (photos.length || draft.editedCover || (draft.hasPhoto && !draft.photoRemoved))) name = "物品照片 " + formatTime(new Date().toISOString());
   if (!name) {
@@ -658,7 +673,7 @@ $("form").onsubmit = async event => {
   if (record.level > 1 && record.level < 4) record.positionType = $("position-type").value;
   if (names.some(value => value.length > 80) || (names.length > 1 && photos.length && names.length !== photos.length)) {
     $("form-status").textContent = names.some(value => value.length > 80)
-      ? "每個物品名稱最多 80 個字。" : "請讓物品名稱和照片張數相同，以便依序配對。";
+      ? "每個名稱最多 80 個字。" : "請讓名稱數量和照片張數相同，以便依序配對。";
     return;
   }
   if (record.level === 4 && photos.length) {
@@ -669,7 +684,11 @@ $("form").onsubmit = async event => {
   }
   delete record.photos;
   if (names.length > 1) {
-    for (const itemName of names) queuePhotoUpload({ ...record, name: itemName });
+    for (const [index, entryName] of names.entries()) {
+      const position = record.level < 4 ? batchSpacePosition(record, parent, index, names.length) : {};
+      const photo = photos[index]?.photo;
+      queuePhotoUpload({ ...record, ...position, name: entryName, photo, compressPhoto: Boolean(photo) });
+    }
     return;
   }
   if (record.level < 4) {

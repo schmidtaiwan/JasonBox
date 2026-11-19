@@ -364,6 +364,20 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   get('marker-settings-form').onsubmit({ preventDefault() {} });
   const iconsOnly = get('floor-image').children[0].children.find(node => node.attrs.role === 'button');
   assert.ok(!iconsOnly.children.some(node => node.attrs['text-anchor']));
+  run('navigate(entries.find(e => e.id === "left")); newEntryAtCurrent("position")');
+  get('name').value = '左格  右格　上層';
+  await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const spaces = records.filter(record => record.parent === 'left' && ['左格', '右格', '上層'].includes(record.name));
+  assert.equal(spaces.length, 3);
+  assert.equal(new Set(spaces.map(space => space.photoX)).size, 3, 'batch-created spaces have distinct marker positions');
+  const editId = spaces[0].id;
+  context.batchSpaceId = editId;
+  run('edit(entries.find(e => e.id === batchSpaceId))');
+  get('name').value = '左 格';
+  await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(records.find(record => record.id === editId).name, '左 格', 'renaming preserves spaces inside a name');
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 44;
+const PAGE_BUILD = 45;
 const PAGE_DATE = "2026-11-19";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -335,7 +335,8 @@ function render() {
   $("back").disabled = !signedIn || (!current && !navigationHistory.length && !query);
   document.querySelector("footer").hidden = !signedIn;
   $("edit-space").hidden = !current || current.level === 0;
-  $("move-items").hidden = !signedIn || Boolean(query) || !movableItems(current).length || !moveTargets(current).length;
+  $("delete-items").hidden = !signedIn || Boolean(query) || !movableItems(current).length;
+  $("move-items").hidden = $("delete-items").hidden || !moveTargets(current).length;
   $("edit-space").onclick = () => edit(current);
   $("list").replaceChildren(...visible.map(entry => card(entry, Boolean(query))));
   if (!visible.length) {
@@ -363,10 +364,11 @@ let moveSelection;
 let movingItems = false;
 
 function updateMoveControls() {
-  $("move-confirm").disabled = movingItems || !moveSelection?.selected.size || !$("move-target").value;
+  const deleting = moveSelection?.deleting;
+  $("move-confirm").disabled = movingItems || !moveSelection?.selected.size || (!deleting && !$("move-target").value);
   $("move-close").disabled = movingItems;
   $("move-options").disabled = movingItems;
-  $("move-target").disabled = movingItems;
+  $("move-target").disabled = movingItems || Boolean(deleting);
 }
 
 function renderMoveOptions() {
@@ -387,10 +389,14 @@ function renderMoveOptions() {
   updateMoveControls();
 }
 
-$("move-items").onclick = () => {
-  const targets = moveTargets(current);
-  if (!targets.length || !movableItems(current).length) return;
-  moveSelection = { source: current, selected: new Set() };
+function openItemSelection(deleting) {
+  const targets = deleting ? [] : moveTargets(current);
+  if ((!deleting && !targets.length) || !movableItems(current).length) return;
+  moveSelection = { source: current, selected: new Set(), deleting };
+  $("move-title").textContent = deleting ? "多選刪除物品" : "移動物品";
+  $("move-confirm").textContent = deleting ? "刪除所選物品" : "移動";
+  $("move-confirm").className = deleting ? "danger" : "primary";
+  $("move-target-field").hidden = deleting;
   $("move-source").textContent = "來源：" + ancestors(current).map(space => space.name).join(" / ");
   $("move-status").textContent = "";
   const placeholder = element("option", "選擇目的地");
@@ -404,42 +410,52 @@ $("move-items").onclick = () => {
   $("move-target").value = "";
   renderMoveOptions();
   moveDialog.showModal();
-};
+}
+$("move-items").onclick = () => openItemSelection(false);
+$("delete-items").onclick = () => openItemSelection(true);
 $("move-target").onchange = updateMoveControls;
 $("move-close").onclick = () => { if (!movingItems) moveDialog.close(); };
 moveDialog.oncancel = event => { if (movingItems) event.preventDefault(); };
 $("move-form").onsubmit = async event => {
   event.preventDefault();
   if (movingItems || !moveSelection) return;
-  const { source, selected } = moveSelection;
-  const target = moveTargets(source).find(space => space.id === $("move-target").value);
+  const { source, selected, deleting } = moveSelection;
+  const target = deleting ? null : moveTargets(source).find(space => space.id === $("move-target").value);
   const batch = movableItems(source).filter(item => selected.has(item.id));
-  if (!target || !batch.length) return;
+  if ((!deleting && !target) || !batch.length) return;
+  if (deleting && !window.confirm("確定將 " + batch.length + " 件物品移到 Google Drive 垃圾桶？")) return;
   movingItems = true;
   updateMoveControls();
-  $("move-status").textContent = "正在移動 " + batch.length + " 件物品…";
+  const action = deleting ? "刪除" : "移動";
+  $("move-status").textContent = "正在" + action + " " + batch.length + " 件物品…";
   const errors = [];
-  let moved = 0;
+  let completed = 0;
   try {
     for (const item of batch) {
       try {
-        const saved = await drive.moveItem(item, target);
-        entries = entries.map(entry => entry.id === item.id ? saved : entry);
+        if (deleting) {
+          await drive.remove(item);
+          entries = entries.filter(entry => entry.id !== item.id);
+        } else {
+          const saved = await drive.moveItem(item, target);
+          entries = entries.map(entry => entry.id === item.id ? saved : entry);
+        }
         selected.delete(item.id);
-        moved++;
+        completed++;
       } catch (error) {
         errors.push(error.message);
         if (error instanceof drive.SessionExpired) break;
       }
     }
-    if (moved) await Promise.all([touchParent(source.id), touchParent(target.id)]);
+    if (completed) await Promise.all([touchParent(source.id), target && touchParent(target.id)]);
     render();
     if (errors.length) {
-      $("move-status").textContent = "已移動 " + moved + " 件，尚有 " + (batch.length - moved) + " 件未確認：" + errors[0];
+      $("move-status").textContent = "已" + action + " " + completed + " 件，尚有 " + (batch.length - completed) + " 件未確認：" + errors[0];
       renderMoveOptions();
     } else {
       moveDialog.close();
-      $("mutation-status").textContent = "已將 " + moved + " 件物品移到「" + target.name + "」。";
+      $("mutation-status").textContent = deleting ? "已將 " + completed + " 件物品移到 Google Drive 垃圾桶。"
+        : "已將 " + completed + " 件物品移到「" + target.name + "」。";
     }
   } finally {
     movingItems = false;

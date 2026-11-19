@@ -201,7 +201,7 @@ footer { z-index: 20; }
 #icon-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 #icon-choices .appearance-choice { min-width: 0; padding-inline: 2px; text-align: center; overflow-wrap: anywhere; }
 #icon-choices .space-choice-icon { width: min(40px, 100%); height: auto; aspect-ratio: 1; }
-.list-actions { display: flex; align-items: center; gap: 8px; }
+.list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
 #move-options { min-width: 0; margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; }
 #move-list { max-height: 32dvh; overflow-y: auto; }
 #move-list label { min-height: 44px; display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }

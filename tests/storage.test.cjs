@@ -378,6 +378,22 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await get('form').onsubmit({ preventDefault() {} });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(records.find(record => record.id === editId).name, '左 格', 'renaming preserves spaces inside a name');
+  run('navigate(entries.find(e => e.id === "right"))');
+  assert.equal(get('delete-items').hidden, false);
+  get('delete-items').onclick();
+  assert.equal(get('move-target').disabled, true);
+  for (const row of get('move-list').children) {
+    row.children[0].checked = true;
+    row.children[0].onchange();
+  }
+  context.window.confirm = () => false;
+  await get('move-form').onsubmit({ preventDefault() {} });
+  assert.equal(records.filter(record => record.parent === 'right').length, 2);
+  context.window.confirm = () => true;
+  await get('move-form').onsubmit({ preventDefault() {} });
+  assert.equal(records.filter(record => record.parent === 'right').length, 0);
+  assert.ok(records.some(record => record.id === 'stay'));
+  assert.ok(records.some(record => record.id === 'right'), 'batch delete removes items only');
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

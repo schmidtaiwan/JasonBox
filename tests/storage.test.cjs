@@ -18,7 +18,7 @@ class Node {
   setPointerCapture(id) { this.pointerId = id; }
   hasPointerCapture(id) { return this.pointerId === id; }
   releasePointerCapture() { this.pointerId = null; }
-  classList = { add() {} };
+  classList = { add() {}, remove() {} };
   getScreenCTM() { return { inverse: () => ({}) }; }
   createSVGPoint() { return { matrixTransform() { return { x: this.x, y: this.y }; } }; }
 }
@@ -28,9 +28,10 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const get = id => { if (!nodes.has(id)) nodes.set(id, new Node()); return nodes.get(id); };
   let records = [], count = 0;
   const timers = new Map(); let nextTimer = 0;
+  const listeners = new Map();
   const context = {
-    document: { getElementById: get, querySelector: get, createElement: () => new Node(), createElementNS: () => new Node(), addEventListener() {} },
-    window: { location: { protocol: 'https:' }, addEventListener() {}, scrollTo() {}, confirm: () => true },
+    document: { body: new Node(), documentElement: new Node(), getElementById: get, querySelector: get, createElement: () => new Node(), createElementNS: () => new Node(), addEventListener(type, callback) { listeners.set(type, callback); } },
+    window: { scrollX: 0, scrollY: 420, location: { protocol: 'https:' }, addEventListener() {}, scrollTo(x, y) { this.lastScroll = [x, y]; }, confirm: () => true },
     URL, Blob, Intl, Date, console, setInterval() {}, fetch: async () => ({ ok: false }),
     setTimeout(callback, delay) { assert.equal(delay, 1000); timers.set(++nextTimer, callback); return nextTimer; },
     clearTimeout(id) { timers.delete(id); },
@@ -71,6 +72,13 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   marker.onpointerdown(pointer);
   [...timers.values()][0]();
   assert.equal(run('planAdjustment.id'), storage.id, 'one-second hold enters adjustment mode');
+  assert.equal(context.document.body.style.position, 'fixed', 'page freezes during adjustment');
+  assert.equal(context.document.body.style.top, '-420px');
+  for (const type of ['wheel', 'touchmove']) {
+    let prevented = false;
+    listeners.get(type)({ preventDefault() { prevented = true; } });
+    assert.ok(prevented, type + ' cannot scroll during adjustment');
+  }
   marker.onpointermove({ ...pointer, clientX: 0, clientY: 900 });
   assert.equal(run('planAdjustment.x'), 494 / 1672, 'drag stays within its original floor');
   assert.equal(run('planAdjustment.y'), 810 / 941);
@@ -81,9 +89,13 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('planAdjustment.scale'), 1.1);
   get('marker-tools').children[5].onclick();
   assert.equal(run('planAdjustment'), null);
+  assert.equal(run('adjustmentScroll'), null, 'cancel releases scroll lock');
+  assert.deepEqual(context.window.lastScroll, [0, 420], 'cancel restores original scroll position');
+  listeners.get('touchmove')({ preventDefault() { assert.fail('normal scrolling should resume after cancel'); } });
   assert.equal(records.find(r => r.id === storage.id).x, 570 / 1672, 'cancel restores persisted position');
   run('startAdjustment(entries.find(e => e.name === "床底下")); planAdjustment.scale = 1.5; planAdjustment.x = .34');
   await run('saveAdjustment()');
+  assert.equal(run('adjustmentScroll'), null, 'successful save releases scroll lock');
   await run('refresh()');
   assert.equal(run('entries.find(e => e.name === "床底下").scale'), 1.5);
   assert.equal(run('entries.find(e => e.name === "床底下").x'), .34);

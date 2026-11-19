@@ -7,6 +7,37 @@ const planBounds = [
 ];
 let planAdjustment = null;
 let adjustingSave = false;
+let adjustmentScroll = null;
+
+function lockAdjustmentScroll(locked) {
+  if (locked && !adjustmentScroll) {
+    const body = document.body;
+    adjustmentScroll = { x: window.scrollX, y: window.scrollY, style: body.style.cssText };
+    document.documentElement.classList.add("adjustment-scroll-lock");
+    body.style.position = "fixed";
+    body.style.top = -adjustmentScroll.y + "px";
+    body.style.left = -adjustmentScroll.x + "px";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+  } else if (!locked && adjustmentScroll) {
+    const previous = adjustmentScroll;
+    adjustmentScroll = null;
+    document.documentElement.classList.remove("adjustment-scroll-lock");
+    document.body.style.cssText = previous.style;
+    window.scrollTo(previous.x, previous.y);
+  }
+}
+
+// iOS touch scrolling and desktop wheel scrolling must also stay locked.
+for (const type of ["touchmove", "wheel"]) {
+  document.addEventListener(type, event => {
+    if (adjustmentScroll) event.preventDefault();
+  }, { passive: false });
+}
+document.addEventListener("keydown", event => {
+  if (adjustmentScroll && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)
+      && event.target === document.body) event.preventDefault();
+});
 
 function markerScale(entry) {
   return Math.min(2.5, Math.max(.5, Number(entry.scale) || 1));
@@ -19,6 +50,7 @@ function startAdjustment(entry) {
 }
 
 function renderAdjustmentTools() {
+  lockAdjustmentScroll(Boolean(planAdjustment));
   const host = $("marker-tools");
   host.hidden = !planAdjustment;
   if (!planAdjustment) { host.replaceChildren(); return; }
@@ -144,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 20, 20, bounds[2] - bounds[0] + 40, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "點選平面圖新增存放空間", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=8", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=9", width: 1672, height: 941 }));
   const addAt = (x, y) => {
     if (planAdjustment || adjustingSave) return;
     const index = planBounds.findIndex(([left, top, right, bottom]) => x >= left && x <= right && y >= top && y <= bottom);

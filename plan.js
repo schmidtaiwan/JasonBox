@@ -175,33 +175,8 @@ function renderFloorPlans(query) {
   host.removeAttribute("role");
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
-  const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "點選平面圖新增存放空間", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=25", width: 1672, height: 941 }));
-  const addAt = (x, y) => {
-    if (planAdjustment || adjustingSave) return;
-    const index = planBounds.findIndex(([left, top, right, bottom]) => x >= left && x <= right && y >= top && y <= bottom);
-    if (index < 0) return;
-    const parent = entries.find(entry => entry.level === 0 && floorNumber(entry.name) === index + 1);
-    if (!parent) return;
-    edit(null, { parent: parent.id, level: 1, x: x / 1672, y: y / 941 });
-  };
-  svg.onclick = event => {
-    // Map CSS pixels through the SVG transform, including letterboxing.
-    const point = svg.createSVGPoint();
-    point.x = event.clientX;
-    point.y = event.clientY;
-    const matrix = svg.getScreenCTM();
-    if (!matrix) return;
-    const local = point.matrixTransform(matrix.inverse());
-    addAt(local.x, local.y);
-  };
-  svg.setAttribute("tabindex", "0");
-  svg.onkeydown = event => {
-    if (event.target !== svg || !["Enter", " "].includes(event.key)) return;
-    event.preventDefault();
-    const [left, top, right, bottom] = bounds || planBounds[0];
-    addAt((left + right) / 2, (top + bottom) / 2);
-  };
+  const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=26", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -268,7 +243,7 @@ function renderSpaceLayout(query) {
   host.append(upload);
   if (uploadStatus(space)) host.append(button(uploadStatus(space), "quiet", () => openItem(space)));
   if (!space.hasPhoto) {
-    host.append(element("p", "上傳床、櫃子等空間的照片後，可直接點照片新增區、格、層。", "muted"));
+    host.append(element("p", "可上傳空間照片；按下方「加入」新增區、格、層或物品。", "muted"));
     return;
   }
   const canvas = element("div", "", "space-photo-canvas");
@@ -318,10 +293,6 @@ function renderSpaceLayout(query) {
       photoY: Math.min(.97, Math.max(.03, (event.clientY - rect.top) / rect.height))
     };
   };
-  canvas.onclick = event => {
-    if (space.level >= 3 || photoUploads.has(space.id)) return;
-    edit(null, { level: space.level + 1, parent: space.id, positionType: "區", ...pointAt(event) });
-  };
   for (const position of entries.filter(entry => entry.parent === space.id && entry.level !== 4)) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
@@ -370,5 +341,5 @@ function renderSpaceLayout(query) {
     marker.onpointercancel = () => { drag = null; suppressClick = true; place(position); };
     canvas.append(marker);
   }
-  host.append(element("p", space.level < 3 ? "點照片新增內部位置；拖曳圖示調整位置，點圖示查看內容。" : "點圖示查看內容。", "muted"));
+  host.append(element("p", space.level < 3 ? "按下方「加入」新增內部位置；拖曳圖示調整位置，點圖示查看內容。" : "點圖示查看內容。", "muted"));
 }

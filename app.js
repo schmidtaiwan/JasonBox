@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 25;
+const PAGE_BUILD = 26;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -280,7 +280,7 @@ function render() {
   }
   $("page-title").textContent = current?.name ?? "我的收納";
   $("summary").textContent = current
-    ? (current.level === 0 ? "點平面圖新增存放空間" : "更動：" + formatTime(current.updatedAt))
+    ? (current.level === 0 ? "按下方「加入」新增空間或物品" : "更動：" + formatTime(current.updatedAt))
     : "固定四層樓　·　" +
       entries.filter(entry => entry.level === 4).length + " 件物品";
   $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "內部位置與物品";
@@ -291,13 +291,12 @@ function render() {
   $("add").title = current ? "加入到「" + ancestors(current).map(entry => entry.name).join(" / ") + "」" : "請先選擇樓層、櫃子或內部位置";
   $("back").disabled = !signedIn || (!current && !navigationHistory.length && !query);
   document.querySelector("footer").hidden = !signedIn;
-  $("add-position").hidden = !current || current.level < 1 || current.level >= 3 || Boolean(query);
   $("edit-space").hidden = !current || current.level === 0;
   $("edit-space").onclick = () => edit(current);
   $("list").replaceChildren(...visible.map(entry => card(entry, Boolean(query))));
   if (!visible.length) {
     const message = query ? "找不到符合的空間或物品。" : !current || current.level === 0
-      ? "直接點平面圖上的位置，建立櫃子、床底下等存放空間。"
+      ? "按下方「加入」，建立存放空間或物品。"
       : "這裡還沒有物品，可新增照片或填寫物品名稱。";
     $("list").append(element("p", message, "empty"));
   }
@@ -310,6 +309,13 @@ function edit(entry, placement) {
   $("position-type-field").hidden = !isPosition;
   const label = draft.level === 4 ? "物品" : isPosition ? "內部位置" : "存放空間";
   $("form").reset();
+  $("add-kind-field").hidden = Boolean(draft.id);
+  $("add-kind").replaceChildren(...availableAddKinds().map(([value, text]) => {
+    const option = element("option", text);
+    option.value = value;
+    return option;
+  }));
+  $("add-kind").value = draft.level === 4 ? "item" : draft.level === 1 ? "space" : draft.positionType || "區";
   $("gallery").multiple = !draft.id && draft.level === 4;
   $("batch-preview").replaceChildren();
   $("position-type").value = draft.positionType || "區";
@@ -412,9 +418,30 @@ $("remove-photo").onclick = () => {
   showPhoto();
 };
 $("search").oninput = render;
-$("add").onclick = () => {
+function availableAddKinds() {
+  if (!current) return [];
+  return current.level === 0 ? [["item", "物品"], ["space", "空間／櫃子"]]
+    : current.level < 3 ? [["item", "物品"], ["區", "區"], ["格", "格"], ["層", "層"]]
+    : [["item", "物品"]];
+}
+function newEntryAtCurrent(kind) {
   if (!current) return;
-  edit(null, { level: 4, parent: current.id });
+  const record = { level: 4, parent: current.id };
+  if (kind === "space" && current.level === 0) {
+    const floor = floorNumber(current.name);
+    const [left, top, right, bottom] = planBounds[(floor || 1) - 1];
+    Object.assign(record, { level: 1, x: (left + right) / 2 / 1672, y: (top + bottom) / 2 / 941 });
+  } else if (["區", "格", "層"].includes(kind) && current.level > 0 && current.level < 3) {
+    Object.assign(record, { level: current.level + 1, positionType: kind, photoX: .5, photoY: .5 });
+  }
+  edit(null, record);
+}
+$("add").onclick = () => newEntryAtCurrent("item");
+$("add-kind").onchange = () => {
+  const name = $("name").value;
+  const kind = $("add-kind").value;
+  newEntryAtCurrent(kind);
+  $("name").value = name;
 };
 $("back").onclick = () => {
   if (adjustingSave) return;
@@ -423,10 +450,6 @@ $("back").onclick = () => {
   $("search").value = previous.query || "";
   render();
   window.scrollTo(previous.x, previous.y);
-};
-$("add-position").onclick = () => {
-  if (!current || current.level < 1 || current.level >= 3) return;
-  edit(null, { level: current.level + 1, parent: current.id, positionType: "區" });
 };
 $("close").onclick = () => { if (!saving) closeEditor(); };
 editor.oncancel = event => {

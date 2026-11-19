@@ -64,3 +64,17 @@ dialog::backdrop { background: #172c20a0; }
 .photo-button input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
 .editor-actions .primary { flex: 1; }
 .danger { color: #a02828; background: transparent; border: 1px solid #edd0ca; border-radius: 12px; padding: 8px 16px; }
+.floor-plans { margin-top: 20px; padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: white; }
+.floor-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.floor-tab { min-height: 44px; padding: 8px 18px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.floor-tab.selected { background: var(--green); color: white; }
+.floor-image { position: relative; overflow: hidden; aspect-ratio: 1672 / 941; background: white; }
+.floor-image img { display: block; width: 100%; }
+.floor-image[class*="floor-"]:not(.floor-image) { background: white; }
+.floor-image.floor-1, .floor-image.floor-2, .floor-image.floor-3, .floor-image.floor-4 { width: min(100%, 340px); margin: auto; aspect-ratio: 360 / 900; }
+.floor-image.floor-1 img, .floor-image.floor-2 img, .floor-image.floor-3 img, .floor-image.floor-4 img { position: absolute; width: 464.45%; max-width: none; top: 0; }
+.floor-image.floor-1 img { left: -24%; }
+.floor-image.floor-2 img { left: -129%; }
+.floor-image.floor-3 img { left: -235%; }
+.floor-image.floor-4 img { left: -340%; }
+.plan-original { display: inline-block; padding-block: 12px; color: var(--green); }

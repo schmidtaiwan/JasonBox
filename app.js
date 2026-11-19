@@ -1,8 +1,8 @@
 "use strict";
 
-const labels = ["樓層", "房間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 1;
-const PAGE_DATE = "2026-11-18";
+const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
+const PAGE_BUILD = 2;
+const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
 const updateDialog = $("update-dialog");
@@ -60,8 +60,33 @@ const thumbnails = new IntersectionObserver(changes => {
 
 async function refresh() {
   entries = await drive.readEntries();
+  for (let floor = 1; floor <= 4; floor++) {
+    const existing = entries.find(entry => entry.level === 0 && floorNumber(entry.name) === floor);
+    if (!existing) entries.push(await drive.save({ name: floor + "F", level: 0, parent: null }));
+  }
   if (current) current = entries.find(entry => entry.id === current.id) ?? null;
   render();
+}
+
+function floorNumber(name) {
+  const match = name.trim().match(/^(?:([1-4])\s*(?:f|樓|層)|([一二三四])樓)$/i);
+  return match ? Number(match[1] || "一二三四".indexOf(match[2]) + 1) : null;
+}
+
+function renderFloorPlans(query) {
+  const section = $("floor-plans");
+  section.hidden = Boolean(query);
+  const floor = ancestors(current).find(entry => entry.level === 0);
+  const number = floor ? floorNumber(floor.name) : null;
+  $("floor-image").className = number ? "floor-image floor-" + number : "floor-image";
+  $("floor-image").setAttribute("aria-label", number ? number + "F 平面圖" : "四層樓平面圖");
+  $("floor-tabs").replaceChildren(...[1, 2, 3, 4].map(value => {
+    const entry = entries.find(item => item.level === 0 && floorNumber(item.name) === value);
+    const tab = button(value + "F", number === value ? "floor-tab selected" : "floor-tab", () => navigate(entry));
+    tab.disabled = !entry;
+    tab.setAttribute("aria-pressed", String(number === value));
+    return tab;
+  }), button("全部樓層", "quiet", () => navigate(null)));
 }
 
 function ancestors(entry) {
@@ -113,7 +138,7 @@ function card(entry, searching) {
     thumbnails.observe(thumb);
   }
   row.append(open);
-  if (!isItem) {
+  if (!isItem && entry.level !== 0) {
     const editButton = button("編輯", "quiet", () => edit(entry));
     editButton.setAttribute("aria-label", "編輯 " + entry.name);
     row.append(editButton);
@@ -128,8 +153,9 @@ function render() {
   const depth = current ? current.level + 1 : 0;
   const query = $("search").value.trim().toLocaleLowerCase();
   const visible = query
-    ? entries.filter(entry => entry.level >= 3 && entry.name.toLocaleLowerCase().includes(query))
+    ? entries.filter(entry => entry.level >= 1 && entry.name.toLocaleLowerCase().includes(query))
     : entries.filter(entry => entry.parent === (current?.id ?? null));
+  renderFloorPlans(query);
   const path = $("path");
   path.replaceChildren();
   for (const entry of [null, ...ancestors(current)]) {
@@ -144,20 +170,22 @@ function render() {
   }
   $("page-title").textContent = current?.name ?? "我的收納";
   $("summary").textContent = current
-    ? labels[current.level]
+    ? labels[current.level] + (current.level === 0 ? "・可新增空間，樓層固定" : "")
     : entries.filter(entry => entry.level === 0).length + " 個樓層　·　" +
       entries.filter(entry => entry.level === 4).length + " 件物品";
   $("list-title").textContent = query ? "搜尋結果" : labels[depth] + "清單";
   $("count").textContent = visible.length + (depth === 4 && !query ? " 件" : " 筆");
-  $("add").textContent = "＋ 新增" + labels[depth];
+  $("add").textContent = depth ? "＋ 新增" + labels[depth] : "請先選擇樓層";
+  $("add").hidden = depth === 0 || Boolean(query);
   $("list").replaceChildren(...visible.map(entry => card(entry, Boolean(query))));
   if (!visible.length) {
-    const message = query ? "找不到符合的物品或分類箱。" : "這裡還沒有" + labels[depth] + "。";
+    const message = query ? "找不到符合的空間、櫃子或物品。" : "這裡還沒有" + labels[depth] + "。";
     $("list").append(element("p", message, "empty"));
   }
 }
 
 function edit(entry) {
+  if (entry?.level === 0 || (!entry && !current)) return;
   draft = entry ? { ...entry } : { level: current ? current.level + 1 : 0, parent: current?.id ?? null };
   const label = labels[draft.level];
   $("form").reset();
@@ -258,7 +286,7 @@ function closeEditor() {
 }
 $("form").onsubmit = async event => {
   event.preventDefault();
-  if ($("save").disabled) return;
+  if ($("save").disabled || !draft || draft.level === 0) return;
   const name = $("name").value.trim();
   if (!name) {
     $("form-status").textContent = "請輸入名稱。";
@@ -284,6 +312,7 @@ $("form").onsubmit = async event => {
   }
 };
 $("remove").onclick = async () => {
+  if (!draft || draft.level === 0) return;
   if (entries.some(entry => entry.parent === draft.id)) {
     $("form-status").textContent = "請先清空這個位置的清單，再刪除。";
     return;

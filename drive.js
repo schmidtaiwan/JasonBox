@@ -173,7 +173,7 @@ const drive = (() => {
       metadata.parents = [parentId];
     }
     if (level < 4) {
-      if (["cabinet", "bed", "box", "shelf", "drawer", "closet", "bag", "home"].includes(record.iconKey)) metadata.appProperties.iconKey = record.iconKey;
+      if (["cabinet", "bed", "box", "shelf", "drawer", "closet", "bag", "home", "photo"].includes(record.iconKey)) metadata.appProperties.iconKey = record.iconKey;
       if (/^#[0-9a-f]{6}$/i.test(record.iconColor || "")) metadata.appProperties.iconColor = record.iconColor;
       if (!id && photo) {
         const created = await write({ ...metadata, mimeType: folder });

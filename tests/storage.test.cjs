@@ -136,7 +136,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('current.id'), storage.id);
   get('current-space-icon').onclick();
   assert.equal(get('appearance-dialog').open, true);
-  assert.equal(get('icon-choices').children.length, 8);
+  assert.equal(get('icon-choices').children.length, 9);
   assert.equal(get('color-choices').children.length, 8);
   get('icon-choices').children[1].onclick();
   get('color-choices').children[1].onclick();
@@ -341,6 +341,9 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   const styled = await run('drive.save({id:"space",name:"床",parent:"floor",level:1,iconKey:"bed",iconColor:"#1768a6"})');
   assert.equal(styled.iconKey, 'bed');
   assert.equal(styled.iconColor, '#1768a6');
+  const photoStyled = await run('drive.save({id:"space",name:"床",parent:"floor",level:1,iconKey:"photo"})');
+  assert.equal(photoStyled.iconKey, 'photo');
+
 
   assert.equal(marker.updatedBy, 'jason660803@example.com');
   const item = await run('drive.save({name:"新物品",parent:"space",level:4})');

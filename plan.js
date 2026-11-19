@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=34", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=35", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -189,6 +189,7 @@ function renderFloorPlans(query) {
     const circle = svgNode("circle", { r: 19 });
     circle.style.fill = appearance.color;
     marker.append(circle, svgNode("path", { d: appearance.icon[2] }));
+    if (appearance.icon[0] === "photo") addPhotoThumbnail(marker, entry, 28);
     const text = svgNode("text", { y: 37, "text-anchor": "middle" });
     text.textContent = entry.name;
     marker.append(text);

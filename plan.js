@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=46", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=47", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -247,6 +247,39 @@ function markerTone(pixels) {
   return average + .05 >= .0525 / (average + .05) ? "dark" : "light";
 }
 let spaceLayoutGeneration = 0;
+function addSpacePhotoZoom(host, canvas, spaceId) {
+  const key = "jasonbox-space-photo-size:" + spaceId;
+  let size = 100;
+  try {
+    const saved = Number(localStorage.getItem(key));
+    if (Number.isInteger(saved) && saved >= 50 && saved <= 200) size = saved;
+  } catch {}
+
+  const controls = element("label", "照片大小", "space-photo-zoom");
+  const slider = element("input", "");
+  Object.assign(slider, { type: "range", min: "50", max: "200", step: "5", value: String(size) });
+  slider.setAttribute("aria-label", "空間照片大小");
+  const readout = element("output", size + "%");
+  const viewport = element("div", "", "space-photo-viewport");
+  canvas.style.width = size + "%";
+  slider.oninput = () => {
+    const halfWidth = viewport.clientWidth / 2;
+    const center = size <= 100 ? .5 : (viewport.scrollLeft + halfWidth) / canvas.offsetWidth;
+    size = Number(slider.value);
+    canvas.style.width = size + "%";
+    readout.textContent = size + "%";
+    slider.setAttribute("aria-valuetext", size + "%");
+    if (size > 100) viewport.scrollLeft = center * canvas.offsetWidth - halfWidth;
+  };
+  slider.onchange = () => {
+    try { localStorage.setItem(key, String(size)); } catch {}
+  };
+  slider.setAttribute("aria-valuetext", size + "%");
+  controls.append(slider, readout);
+  viewport.append(canvas);
+  host.append(controls, viewport);
+}
+
 function renderSpaceLayout(query) {
   const generation = ++spaceLayoutGeneration;
   const host = $("space-layout");
@@ -267,7 +300,7 @@ function renderSpaceLayout(query) {
   const image = element("img", "", "space-photo");
   image.alt = space.name + "的照片";
   canvas.append(image);
-  host.append(canvas);
+  addSpacePhotoZoom(host, canvas, space.id);
   if (space.spaceAlbum) {
     const gallery = element("div", "", "batch-preview");
     host.append(gallery);

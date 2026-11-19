@@ -203,9 +203,20 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   run('navigate(entries.find(e => e.name === "上層"))');
   get('add').onclick();
   assert.equal(run('draft.parent'), position.id);
+  assert.ok(get('location').textContent.endsWith('床底下 / 上層'), 'add dialog identifies the current nested location');
+
   get('name').value = '層內物品';
   await get('form').onsubmit({ preventDefault() {} });
   assert.ok(records.some(r => r.name === '層內物品' && r.parent === position.id));
+  run('navigate(entries.find(e => e.level === 0))');
+  assert.equal(get('add').disabled, false, 'items may also be added at the selected floor');
+  get('add').onclick();
+  assert.equal(run('draft.parent'), run('current.id'));
+  get('name').value = '樓層物品';
+  await get('form').onsubmit({ preventDefault() {} });
+  assert.ok(records.some(r => r.name === '樓層物品' && r.parent === run('current.id')));
+  run('navigate(entries.find(e => e.name === "上層"))');
+
   run('edit(entries.find(e => e.name === "上層"))');
   await get('remove').onclick();
   assert.ok(records.some(r => r.id === position.id), 'nonempty position cannot be deleted');

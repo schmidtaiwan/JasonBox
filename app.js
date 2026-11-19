@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 24;
+const PAGE_BUILD = 25;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -287,8 +287,8 @@ function render() {
   $("count").textContent = visible.length + (depth === 4 && !query ? " 件" : " 筆");
   $("add").textContent = "加入";
   $("add").hidden = false;
-  $("add").disabled = !signedIn || !current || current.level === 0;
-  $("add").title = current && current.level > 0 ? "新增存放物品" : "請先進入櫃子或內部位置";
+  $("add").disabled = !signedIn || !current;
+  $("add").title = current ? "加入到「" + ancestors(current).map(entry => entry.name).join(" / ") + "」" : "請先選擇樓層、櫃子或內部位置";
   $("back").disabled = !signedIn || (!current && !navigationHistory.length && !query);
   document.querySelector("footer").hidden = !signedIn;
   $("add-position").hidden = !current || current.level < 1 || current.level >= 3 || Boolean(query);
@@ -305,7 +305,6 @@ function render() {
 
 function edit(entry, placement) {
   if (entry?.level === 0 || (!entry && !current && !placement)) return;
-  if (!entry && !placement && current?.level === 0) return;
   draft = entry ? { ...entry } : placement ? { ...placement } : { level: 4, parent: current.id };
   const isPosition = draft.level > 1 && draft.level < 4;
   $("position-type-field").hidden = !isPosition;
@@ -316,7 +315,7 @@ function edit(entry, placement) {
   $("position-type").value = draft.positionType || "區";
   $("form-status").textContent = "";
   $("editor-title").textContent = (entry ? "編輯" : "新增") + label;
-  $("location").textContent = ancestors(entries.find(parent => parent.id === draft.parent))
+  $("location").textContent = "存放位置：所有空間 / " + ancestors(entries.find(parent => parent.id === draft.parent))
     .map(parent => parent.name).join(" / ");
   $("name").value = draft.name ?? "";
   $("name").required = draft.level !== 4;
@@ -413,7 +412,10 @@ $("remove-photo").onclick = () => {
   showPhoto();
 };
 $("search").oninput = render;
-$("add").onclick = () => { if (current && current.level > 0) edit(); };
+$("add").onclick = () => {
+  if (!current) return;
+  edit(null, { level: 4, parent: current.id });
+};
 $("back").onclick = () => {
   if (adjustingSave) return;
   const previous = navigationHistory.length ? navigationHistory.pop() : { id: current?.parent, x: 0, y: 0, query: "" };
@@ -552,7 +554,7 @@ function setSignedIn(value) {
   document.querySelector("footer").hidden = !signedIn;
   $("gate").hidden = signedIn;
   $("logout").hidden = !signedIn;
-  $("add").disabled = !signedIn || !current || current.level === 0;
+  $("add").disabled = !signedIn || !current;
   $("back").disabled = !signedIn || (!current && !navigationHistory.length);
   $("header-storage").hidden = !signedIn;
   $("account-menu").hidden = !signedIn;

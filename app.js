@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 36;
+const PAGE_BUILD = 37;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -130,7 +130,7 @@ function uploadStatus(entry) {
 function openItem(entry) {
   const job = photoUploads.get(entry.id);
   if (job) {
-    if (job.failed) void sendPhotoUpload(job);
+    if (job.failed) job.completion = sendPhotoUpload(job);
     return;
   }
   edit(entry);
@@ -161,7 +161,7 @@ function queueSelectedPhotos(record, name) {
 
 function queuePhotoUpload(record) {
   const id = record.id || "pending-photo-" + ++uploadSequence;
-  const local = { ...record, id, hasPhoto: true, updatedAt: new Date().toISOString(), updatedBy: drive.account()?.email,
+  const local = { ...record, id, hasPhoto: Boolean(record.photo || (record.hasPhoto && !record.photoRemoved)), updatedAt: new Date().toISOString(), updatedBy: drive.account()?.email,
     createdAt: record.createdAt || new Date().toISOString() };
   const job = { id, record, local, failed: false, running: false };
   photoUploads.set(id, job);
@@ -169,7 +169,7 @@ function queuePhotoUpload(record) {
   if (current?.id === id) current = local;
   closeEditor();
   render();
-  void sendPhotoUpload(job);
+  job.completion = sendPhotoUpload(job);
 }
 
 async function sendPhotoUpload(job) {
@@ -178,14 +178,31 @@ async function sendPhotoUpload(job) {
   job.failed = false;
   render();
   try {
+    const parentJob = photoUploads.get(job.record.parent);
+    if (parentJob) {
+      await parentJob.completion;
+      if (photoUploads.has(parentJob.id)) throw new Error("上層空間尚未儲存，請先重試上層空間");
+    }
+    if (job.record.compressPhoto && job.record.photo) {
+      job.record.photo = await compress(job.record.photo);
+      job.record.compressPhoto = false;
+    }
     const saved = await drive.save(job.record);
-    entries = entries.filter(entry => entry.id !== job.id).concat(saved);
+    entries = entries.filter(entry => entry.id !== job.id).map(entry =>
+      entry.parent === job.id ? { ...entry, parent: saved.id } : entry).concat(saved);
+    for (const pending of photoUploads.values()) {
+      if (pending.record.parent === job.id) {
+        pending.record.parent = saved.id;
+        pending.local.parent = saved.id;
+      }
+    }
+    navigationHistory = navigationHistory.map(previous => previous.id === job.id ? { ...previous, id: saved.id } : previous);
     photoUploads.delete(job.id);
     if (current?.id === job.id) current = saved;
     await touchParent(saved.parent);
   } catch (error) {
     job.failed = true;
-    $("mutation-status").textContent = "照片尚未上傳：" + error.message + "。點選失敗的物品可重試。";
+    $("mutation-status").textContent = "背景儲存失敗：" + error.message + "。點選失敗項目可重試。";
   } finally {
     job.running = false;
     render();
@@ -309,6 +326,10 @@ function render() {
 }
 
 function edit(entry, placement) {
+  if (entry && photoUploads.has(entry.id)) {
+    openItem(entry);
+    return;
+  }
   if (entry?.level === 0 || (!entry && !current && !placement)) return;
   draft = entry ? { ...entry } : placement ? { ...placement } : { level: 4, parent: current.id };
   const isPosition = draft.level > 1 && draft.level < 4;
@@ -383,32 +404,23 @@ async function pickPhoto(event) {
   const file = files[0];
   event.target.value = "";
   if (!file) return;
-  const version = ++photoVersion;
-  busy(true);
-  $("form-status").textContent = "正在處理照片…";
-  try {
-    const photos = [];
-    for (const selected of (draft.id || draft.level !== 4 ? files.slice(0, 1) : files)) {
-      photos.push({ photo: await compress(selected), name: selected.name.replace(/\.[^.]+$/, "") });
-      if (version !== photoVersion) return;
-    }
-    draft.photo = photos[0].photo;
-    draft.photos = photos;
-    draft.photoRemoved = false;
-    showPhoto();
-    $("batch-preview").replaceChildren(...photos.slice(1).map(item => {
-      const image = element("img", "", "thumb");
-      image.alt = item.name;
-      image.src = URL.createObjectURL(item.photo);
-      objectUrls.push(image.src);
-      return image;
-    }));
-    $("form-status").textContent = photos.length > 1 ? "已選擇 " + photos.length + " 張照片，每張將新增為一筆物品。" : "";
-  } catch {
-    if (version === photoVersion) $("form-status").textContent = "無法讀取這張照片，請試用 JPG 或 PNG。";
-  } finally {
-    if (version === photoVersion) busy(false);
-  }
+  photoVersion++;
+  const photos = (draft.id || draft.level !== 4 ? files.slice(0, 1) : files)
+    .map(selected => ({ photo: selected, name: selected.name.replace(/\.[^.]+$/, "") }));
+  draft.photo = photos[0].photo;
+  draft.photos = photos;
+  draft.compressPhoto = true;
+  draft.photoRemoved = false;
+  showPhoto();
+  $("batch-preview").replaceChildren(...photos.slice(1).map(item => {
+    const image = element("img", "", "thumb");
+    image.alt = item.name;
+    image.src = URL.createObjectURL(item.photo);
+    objectUrls.push(image.src);
+    return image;
+  }));
+  $("form-status").textContent = photos.length > 1 ? "已選擇 " + photos.length + " 張照片，儲存後於背景處理及上傳。" : "儲存後於背景處理及上傳照片。";
+  busy(false);
 }
 
 $("camera").onchange = pickPhoto;
@@ -511,23 +523,7 @@ $("form").onsubmit = async event => {
     queueSelectedPhotos(record, $("name").value.trim());
     return;
   }
-  saving = true;
-  busy(true);
-  $("form-status").textContent = "正在儲存到 Google Drive…";
-  try {
-    const saved = await drive.save(record);
-    entries = [...entries.filter(entry => entry.id !== saved.id), saved];
-    entries.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant", { numeric: true }));
-    if (current?.id === saved.id) current = saved;
-    await touchParent(saved.parent);
-    closeEditor();
-    render();
-  } catch (error) {
-    showError(error);
-  } finally {
-    saving = false;
-    busy(false);
-  }
+  queuePhotoUpload(record);
 };
 $("remove").onclick = async () => {
   if (!draft || draft.level === 0) return;
@@ -680,7 +676,7 @@ $("login").onclick = async () => {
 };
 $("logout").onclick = () => {
   if (photoUploads.size) {
-    $("mutation-status").textContent = "照片尚未上傳完成，請等待完成或點選失敗物品重試後再登出。";
+    $("mutation-status").textContent = "資料尚未儲存完成，請等待完成或點選失敗項目重試後再登出。";
     return;
   }
   signOut();

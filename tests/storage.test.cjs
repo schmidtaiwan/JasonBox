@@ -91,6 +91,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   run('draft.x = 570 / 1672; draft.y = 240 / 941');
   get('name').value = '床底下';
   await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
   const storage = records.find(r => r.name === '床底下');
   run('navigate(null); navigationHistory = []');
   assert.ok(storage.createdAt && storage.updatedAt);
@@ -161,6 +162,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('draft.parent'), storage.id);
   get('name').value = '冬季棉被';
   await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
   const item = records.find(r => r.name === '冬季棉被');
   assert.ok(item.updatedAt);
   get('view-list').onclick();
@@ -179,12 +181,14 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   get('add').onclick();
   get('name').value = '';
   await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(get('editor').open, true, 'empty item is rejected');
   run('draft.photo = new Blob(["test photo"], {type:"image/jpeg"})');
   const realSave = context.drive.save;
   let resolveUpload, rejectUpload;
   context.drive.save = () => new Promise((resolve, reject) => { resolveUpload = resolve; rejectUpload = reject; });
   await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(get('editor').open, false, 'photo editor closes before upload finishes');
   assert.equal(run('photoUploads.size'), 1);
   assert.ok(run('entries.some(e => e.photo && e.id.startsWith("pending-photo-"))'));
@@ -204,6 +208,23 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('photoUploads.size'), 0);
 
   assert.ok(records.some(r => r.name.startsWith('物品照片 ') && r.parent === storage.id), 'photo-only item gets a readable automatic name');
+  const metadataSave = context.drive.save;
+  let releaseParent;
+  context.drive.save = record => record.name === '背景櫃'
+    ? new Promise(resolve => { releaseParent = async () => resolve(await metadataSave(record)); })
+    : metadataSave(record);
+  run('queuePhotoUpload({name:"背景櫃",level:1,parent:entries.find(e => e.level === 0).id})');
+  const pendingParentId = run('entries.find(e => e.name === "背景櫃").id');
+  assert.equal(get('editor').open, false, 'text-only saves also close immediately');
+  run('navigate(entries.find(e => e.name === "背景櫃")); queuePhotoUpload({name:"背景櫃物品",level:4,parent:current.id})');
+  assert.ok(!records.some(r => r.name === '背景櫃物品'), 'child waits for its parent in the background');
+  await releaseParent();
+  await new Promise(resolve => setImmediate(resolve));
+  const savedParent = records.find(r => r.name === '背景櫃');
+  assert.equal(records.find(r => r.name === '背景櫃物品').parent, savedParent.id);
+  assert.notEqual(savedParent.id, pendingParentId);
+  assert.equal(run('current.id'), savedParent.id, 'current location updates to the real Drive id');
+  context.drive.save = metadataSave;
   assert.equal(run('formatTime("2026-11-19T04:00:00Z")').includes('12:00:00'), true);
   run('navigate(entries.find(e => e.name === "床底下"))');
   get('add').onclick();
@@ -213,6 +234,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   get('position-type').value = '層';
   get('name').value = '上層';
   await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
   const position = records.find(r => r.name === '上層');
   assert.equal(position.positionType, '層');
   assert.equal(position.parent, storage.id);
@@ -237,6 +259,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
 
   get('name').value = '層內物品';
   await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
   assert.ok(records.some(r => r.name === '層內物品' && r.parent === position.id));
   assert.equal(run('exportItems().length'), 1, 'nested export only includes current location');
   assert.equal(run('exportItems()[0].name'), '層內物品');

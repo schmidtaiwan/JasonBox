@@ -175,3 +175,5 @@ footer { z-index: 20; }
 .footer-search { width: min(100% - 32px, 680px); margin: 0 auto 10px; }
 .footer-search .search { margin: 0; }
 #toggle-search[aria-expanded="true"] { background: var(--green); color: white; }
+
+.footer-actions > button { display: flex; align-items: center; justify-content: center; gap: 8px; }

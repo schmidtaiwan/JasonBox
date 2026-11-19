@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "點選平面圖新增存放空間", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=23", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=24", width: 1672, height: 941 }));
   const addAt = (x, y) => {
     if (planAdjustment || adjustingSave) return;
     const index = planBounds.findIndex(([left, top, right, bottom]) => x >= left && x <= right && y >= top && y <= bottom);
@@ -238,6 +238,22 @@ function renderFloorPlans(query) {
 
 
 // A space photo uses its own normalized coordinates, independent of floor markers.
+// Choose whichever of black/white has the greater contrast against the sampled photo.
+function markerTone(pixels) {
+  let luminance = 0;
+  let count = 0;
+  const linear = channel => {
+    const value = channel / 255;
+    return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+  };
+  for (let i = 0; i < pixels.length; i += 4) {
+    const alpha = pixels[i + 3] / 255;
+    luminance += alpha * (.2126 * linear(pixels[i]) + .7152 * linear(pixels[i + 1]) + .0722 * linear(pixels[i + 2])) + (1 - alpha);
+    count++;
+  }
+  const average = count ? luminance / count : 1;
+  return average + .05 >= .0525 / (average + .05) ? "dark" : "light";
+}
 let spaceLayoutGeneration = 0;
 function renderSpaceLayout(query) {
   const generation = ++spaceLayoutGeneration;
@@ -260,6 +276,32 @@ function renderSpaceLayout(query) {
   image.alt = space.name + "的照片";
   canvas.append(image);
   host.append(canvas);
+  let samples;
+  const markers = [];
+  const recolor = (marker, value) => {
+    if (!samples) return;
+    const x = Math.round((Number.isFinite(value.photoX) ? value.photoX : .5) * (samples.width - 1));
+    const y = Math.round((Number.isFinite(value.photoY) ? value.photoY : .5) * (samples.height - 1));
+    const left = Math.max(0, x - 8), top = Math.max(0, y - 8);
+    const pixels = samples.context.getImageData(left, top, Math.min(17, samples.width - left), Math.min(17, samples.height - top)).data;
+    marker.setAttribute("data-tone", markerTone(pixels));
+  };
+  image.onload = () => {
+    if (generation !== spaceLayoutGeneration) return;
+    try {
+      const sample = document.createElement("canvas");
+      const scale = Math.min(256 / image.naturalWidth, 256 / image.naturalHeight);
+      sample.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      sample.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = sample.getContext("2d", { willReadFrequently: true });
+      context.drawImage(image, 0, 0, sample.width, sample.height);
+      samples = { width: sample.width, height: sample.height, context };
+      for (const item of markers) recolor(item.marker, item.value);
+    } catch {
+      // The default black badge with a white outline remains legible if sampling is unavailable.
+      samples = undefined;
+    }
+  };
   const show = blob => {
     if (generation !== spaceLayoutGeneration) return;
     image.src = URL.createObjectURL(blob);
@@ -283,10 +325,15 @@ function renderSpaceLayout(query) {
   for (const position of entries.filter(entry => entry.parent === space.id && entry.level !== 4)) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
-    marker.append(element("span", "▣", "space-photo-icon"), element("span", position.name));
+    marker.append(element("span", "▣", "space-photo-icon"), element("span", position.name, "space-photo-label"));
+    marker.setAttribute("data-tone", "dark");
+    const appearance = { marker, value: position };
+    markers.push(appearance);
     const place = value => {
       marker.style.left = (Number.isFinite(value.photoX) ? value.photoX : .5) * 100 + "%";
       marker.style.top = (Number.isFinite(value.photoY) ? value.photoY : .5) * 100 + "%";
+      appearance.value = value;
+      recolor(marker, value);
     };
     place(position);
     let drag;

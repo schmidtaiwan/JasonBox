@@ -55,6 +55,9 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   vm.createContext(context);
   for (const file of ['plan.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
+  assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
+  assert.equal(run('markerTone([0,0,0,255])'), 'light', 'dark photo uses light markers');
+  assert.equal(run('markerTone([0,0,0,0])'), 'dark', 'transparent photo is treated as white');
   await run('refresh()'); await run('refresh()');
   assert.equal(records.length, 4, 'no duplicate floors on reload');
   assert.equal(get('add').hidden, false);

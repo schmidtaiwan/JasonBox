@@ -159,3 +159,8 @@ footer { z-index: 20; }
 .space-photo { display: block; width: 100%; height: auto; }
 .space-photo-marker { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; padding: 4px; max-width: 130px; border: 0; background: transparent; font-size: .85rem; font-weight: 700; text-shadow: 0 0 3px white, 0 0 6px white; touch-action: none; }
 .space-photo-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--green); color: white; border: 2px solid white; font-size: 24px; text-shadow: none; }
+
+.space-photo-marker { --marker-bg: #111; --marker-fg: #fff; color: var(--marker-fg); text-shadow: none; }
+.space-photo-marker[data-tone="light"] { --marker-bg: #fff; --marker-fg: #111; }
+.space-photo-marker .space-photo-icon { background: var(--marker-bg); color: var(--marker-fg); border-color: var(--marker-fg); box-shadow: 0 0 0 1px var(--marker-bg); }
+.space-photo-label { padding: 2px 6px; border-radius: 5px; background: var(--marker-bg); color: var(--marker-fg); border: 1px solid var(--marker-fg); line-height: 1.4; overflow-wrap: anywhere; }

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 12;
+const PAGE_BUILD = 13;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -114,7 +114,33 @@ function navigate(entry) {
   window.scrollTo(0, 0);
 }
 
+function photoListCard(entry) {
+  const section = element("section", "", "photo-list-section");
+  const heading = element("div", "", "photo-list-heading");
+  heading.append(button(entry.name, "quiet", () => entry.level === 4 ? edit(entry) : navigate(entry)));
+  if (entry.level !== 4 && entry.level !== 0) heading.append(button("編輯", "quiet", () => edit(entry)));
+  section.append(heading);
+  const items = entry.level === 4 ? [entry] : entries.filter(item =>
+    item.level === 4 && ancestors(item).some(parent => parent.id === entry.id));
+  const gallery = element("div", "", "photo-list-gallery");
+  for (const item of items) {
+    const tile = button("", "photo-list-item", () => edit(item));
+    tile.setAttribute("aria-label", "編輯物品：" + item.name);
+    const photo = element("span", "尚無照片", "thumb");
+    if (item.hasPhoto) {
+      photo.dataset.id = item.id;
+      thumbnails.observe(photo);
+    }
+    tile.append(photo, element("span", item.name, "photo-list-name"));
+    gallery.append(tile);
+  }
+  if (!items.length) gallery.append(element("p", "這個空間還沒有物品。", "muted"));
+  section.append(gallery);
+  return section;
+}
+
 function card(entry, searching) {
+  if (displayMode === "list") return photoListCard(entry);
   const row = element("div", "", "card");
   const isItem = entry.level === 4;
   const open = button("", "card-main", () => isItem ? edit(entry) : navigate(entry));

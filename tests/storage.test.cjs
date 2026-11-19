@@ -119,6 +119,15 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await get('form').onsubmit({ preventDefault() {} });
   const item = records.find(r => r.name === '冬季棉被');
   assert.ok(item.updatedAt);
+  get('view-list').onclick();
+  const group = run('photoListCard(entries.find(e => e.name === "床底下"))');
+  assert.equal(group.children[0].children[0].textContent, '床底下');
+  assert.equal(group.children[1].children.length, 1);
+  assert.equal(group.children[1].children[0].children[1].textContent, '冬季棉被');
+  group.children[1].children[0].onclick();
+  assert.equal(run('draft.id'), item.id, 'gallery item opens its editor');
+  run('closeEditor()');
+  get('view-details').onclick();
   assert.equal(run('current.updatedAt'), '2026-11-19T04:00:00Z');
   run('edit(entries.find(e => e.name === "冬季棉被"))');
   await get('remove').onclick();

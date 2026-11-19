@@ -127,6 +127,13 @@ dialog::backdrop { background: #172c20a0; }
 .view-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
 .view-switch button { min-height: 44px; padding: 6px 12px; border: 0; background: #fffefa; }
 .view-switch button[aria-pressed="true"] { background: var(--green); color: white; }
-.compact-list .thumb, .compact-list .card-main small { display: none; }
-.compact-list .card-main { min-height: 48px; padding: 10px 12px; }
-.compact-list .card { border-radius: 10px; }
+/* List mode groups item photos beneath each storage-space name. */
+.compact-list { border: 1px solid var(--line); border-radius: 16px; padding: 16px; background: #fffefa; }
+.photo-list-section + .photo-list-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.photo-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.photo-list-heading > button:first-child { font-weight: 700; text-align: left; }
+.photo-list-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin: 8px 8px 0; }
+.photo-list-item { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: white; text-align: left; }
+.photo-list-item .thumb { display: grid; width: 100%; height: auto; aspect-ratio: 1; flex: none; object-fit: contain; }
+.photo-list-name { overflow-wrap: anywhere; line-height: 1.5; }
+.photo-list-gallery > p { grid-column: 1 / -1; padding: 12px; }

@@ -51,7 +51,7 @@ function renderCurrentSpaceIcon() {
   host.hidden = !current || current.level === 0;
   host.replaceChildren();
   if (host.hidden) return;
-  host.append(spaceIconNode(current), element("span", current.name));
+  host.append(spaceIconNode(current));
   host.setAttribute("aria-label", "變更「" + current.name + "」的圖示與顏色");
 }
 let appearanceDraft;

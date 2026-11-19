@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 30;
+const PAGE_BUILD = 31;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -685,3 +685,5 @@ if (window.location.protocol === "file:") {
   link.href = "http://localhost:8000/";
   $("login-status").append("請先執行 preview.cmd，再開啟 ", link, " 以登入 Google。");
 }
+
+$("export-pdf").onclick = exportPdf;

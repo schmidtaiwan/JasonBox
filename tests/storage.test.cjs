@@ -53,7 +53,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     }
   };
   vm.createContext(context);
-  for (const file of ['plan.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
   assert.ok(run('changeDescription({updatedAt: "2026-11-19T04:00:00Z",updatedBy:"backy2777@example.com"})').endsWith(' · BACKY2777'));
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
@@ -219,6 +219,12 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   get('name').value = '層內物品';
   await get('form').onsubmit({ preventDefault() {} });
   assert.ok(records.some(r => r.name === '層內物品' && r.parent === position.id));
+  assert.equal(run('exportItems().length'), 1, 'nested export only includes current location');
+  assert.equal(run('exportItems()[0].name'), '層內物品');
+  assert.ok(run('exportItems()[0].location').endsWith('床底下 / 上層'));
+  assert.ok(run('exportItems(null).length') > 1, 'all-space export includes other items');
+  assert.equal(run('exportEscape("<script>&")'), '&lt;script&gt;&amp;');
+
   run('navigate(entries.find(e => e.level === 0))');
   assert.equal(get('add').disabled, false);
   get('add').onclick();

@@ -167,3 +167,5 @@ footer { z-index: 20; }
 
 .login-photo { display: block; width: 100%; height: auto; margin-top: 16px; border-radius: 16px; }
 .gate { padding-bottom: 20px; }
+
+.export-button { min-height: 44px; padding: 6px 12px; font-size: .9rem; }

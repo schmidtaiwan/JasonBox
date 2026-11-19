@@ -4,7 +4,7 @@ const drive = (() => {
   const folder = "application/vnd.google-apps.folder";
   const filesUrl = "https://www.googleapis.com/drive/v3/files";
   const uploadUrl = "https://www.googleapis.com/upload/drive/v3/files";
-  const fields = "id,name,mimeType,parents,appProperties,createdTime";
+  const fields = "id,name,mimeType,parents,appProperties,createdTime,modifiedTime";
   const itemFilter = "appProperties has { key='jasonBoxItem' and value='1' }";
   let token;
   let expiresAt;
@@ -80,13 +80,18 @@ const drive = (() => {
   }
 
   function entryFromFile(file, level) {
+    if (file.appProperties?.jasonBoxItem === "1") level = 4;
     const hasPhoto = file.mimeType === "image/jpeg";
     return {
       id: file.id,
       name: level === 4 ? file.name.replace(/\.(jpg|json)$/, "") : file.name,
       parent: file.parents[0] === root ? null : file.parents[0],
       level,
-      hasPhoto
+      hasPhoto,
+      createdAt: file.createdTime,
+      updatedAt: file.appProperties?.updatedAt || file.modifiedTime,
+      x: file.appProperties?.x === undefined ? undefined : Number(file.appProperties.x),
+      y: file.appProperties?.y === undefined ? undefined : Number(file.appProperties.y)
     };
   }
 
@@ -98,11 +103,11 @@ const drive = (() => {
       for (let offset = 0; offset < parents.length; offset += 30) {
         const group = parents.slice(offset, offset + 30);
         const within = group.map(id => "'" + id + "' in parents").join(" or ");
-        const kind = level === 4 ? itemFilter : "mimeType='" + folder + "'";
+        const kind = "(mimeType='" + folder + "' or " + itemFilter + ")";
         const children = await list("(" + within + ") and " + kind);
         for (const child of children) {
           entries.push(entryFromFile(child, level));
-          next.push(child.id);
+          if (child.mimeType === folder) next.push(child.id);
         }
       }
       parents = next;
@@ -134,7 +139,11 @@ const drive = (() => {
 
   async function save(record) {
     const { id, name, parent, level, photo, hasPhoto, photoRemoved } = record;
-    const metadata = { name };
+    const metadata = { name, appProperties: { updatedAt: new Date().toISOString() } };
+    if (Number.isFinite(record.x) && Number.isFinite(record.y)) {
+      metadata.appProperties.x = String(record.x);
+      metadata.appProperties.y = String(record.y);
+    }
     if (!id) {
       const parentId = parent ?? root;
       const parentInfo = await request(filesUrl + "/" + encodeURIComponent(parentId) + "?fields=trashed,mimeType");
@@ -148,7 +157,7 @@ const drive = (() => {
     }
     const jpeg = Boolean(photo || (hasPhoto && !photoRemoved));
     metadata.name += jpeg ? ".jpg" : ".json";
-    metadata.appProperties = { jasonBoxItem: "1" };
+    metadata.appProperties.jasonBoxItem = "1";
     const type = jpeg ? "image/jpeg" : "application/json";
     const content = photo || ((!id || photoRemoved) ? new Blob(["{}"], { type }) : undefined);
     if (content) metadata.mimeType = type;
@@ -167,5 +176,9 @@ const drive = (() => {
     return response.blob();
   }
 
-  return { login, logout, readEntries, save, remove, photo, SessionExpired };
+  async function touch(entry) {
+    return entryFromFile(await write({ appProperties: { updatedAt: new Date().toISOString() } }, entry.id), entry.level);
+  }
+
+  return { login, logout, readEntries, save, remove, photo, touch, SessionExpired };
 })();

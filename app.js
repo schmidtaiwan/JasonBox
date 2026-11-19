@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 3;
+const PAGE_BUILD = 4;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -73,22 +73,6 @@ function floorNumber(name) {
   return match ? Number(match[1] || "一二三四".indexOf(match[2]) + 1) : null;
 }
 
-function renderFloorPlans(query) {
-  const section = $("floor-plans");
-  section.hidden = Boolean(query);
-  const floor = ancestors(current).find(entry => entry.level === 0);
-  const number = floor ? floorNumber(floor.name) : null;
-  $("floor-image").className = number ? "floor-image floor-" + number : "floor-image";
-  $("floor-image").setAttribute("aria-label", number ? number + "F 平面圖" : "四層樓平面圖");
-  $("floor-tabs").replaceChildren(...[1, 2, 3, 4].map(value => {
-    const entry = entries.find(item => item.level === 0 && floorNumber(item.name) === value);
-    const tab = button(value + "F", number === value ? "floor-tab selected" : "floor-tab", () => navigate(entry));
-    tab.disabled = !entry;
-    tab.setAttribute("aria-pressed", String(number === value));
-    return tab;
-  }), button("全部樓層", "quiet", () => navigate(null)));
-}
-
 function ancestors(entry) {
   const path = [];
   while (entry) {
@@ -123,12 +107,13 @@ function card(entry, searching) {
   const row = element("div", "", "card");
   const isItem = entry.level === 4;
   const open = button("", "card-main", () => isItem ? edit(entry) : navigate(entry));
-  const count = entries.filter(child => child.parent === entry.id).length;
+  const children = entries.filter(child => child.parent === entry.id);
   const path = ancestors(entry).slice(0, -1).map(parent => parent.name).join(" / ");
   const description = element("span", "");
   description.append(element("strong", entry.name));
   if (searching && path) description.append(element("small", path));
-  else if (!isItem) description.append(element("small", count + " 個" + labels[entry.level + 1]));
+  else if (!isItem) description.append(element("small",
+    children.filter(child => child.level === 4).length + " 件物品 · " + children.filter(child => child.level !== 4).length + " 個空間"));
   const thumb = element("span", labels[entry.level], "thumb");
   const arrow = element("span", "›");
   arrow.setAttribute("aria-hidden", "true");
@@ -137,6 +122,7 @@ function card(entry, searching) {
     thumb.dataset.id = entry.id;
     thumbnails.observe(thumb);
   }
+  description.append(element("small", "更動：" + formatTime(entry.updatedAt), "changed-time"));
   row.append(open);
   if (!isItem && entry.level !== 0) {
     const editButton = button("編輯", "quiet", () => edit(entry));
@@ -154,7 +140,8 @@ function render() {
   const query = $("search").value.trim().toLocaleLowerCase();
   const visible = query
     ? entries.filter(entry => entry.level >= 1 && entry.name.toLocaleLowerCase().includes(query))
-    : entries.filter(entry => entry.parent === (current?.id ?? null));
+    : current ? entries.filter(entry => entry.parent === current.id)
+    : entries.filter(entry => entry.level !== 0 && entry.level !== 4 && entries.find(parent => parent.id === entry.parent)?.level === 0);
   renderFloorPlans(query);
   const path = $("path");
   path.replaceChildren();
@@ -170,31 +157,39 @@ function render() {
   }
   $("page-title").textContent = current?.name ?? "我的收納";
   $("summary").textContent = current
-    ? labels[current.level] + (current.level === 0 ? "・可新增空間，樓層固定" : "")
-    : entries.filter(entry => entry.level === 0).length + " 個樓層　·　" +
+    ? (current.level === 0 ? "點平面圖新增存放空間" : "更動：" + formatTime(current.updatedAt))
+    : "固定四層樓　·　" +
       entries.filter(entry => entry.level === 4).length + " 件物品";
-  $("list-title").textContent = query ? "搜尋結果" : labels[depth] + "清單";
+  $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "存放物品";
   $("count").textContent = visible.length + (depth === 4 && !query ? " 件" : " 筆");
-  $("add").textContent = depth ? "＋ 新增" + labels[depth] : "請先選擇樓層";
-  $("add").hidden = depth === 0 || Boolean(query);
+  $("add").textContent = "＋ 新增存放物品";
+  $("add").hidden = !current || current.level === 0 || Boolean(query);
+  document.querySelector("footer").hidden = $("add").hidden;
+  $("edit-space").hidden = !current || current.level === 0;
+  $("edit-space").onclick = () => edit(current);
   $("list").replaceChildren(...visible.map(entry => card(entry, Boolean(query))));
   if (!visible.length) {
-    const message = query ? "找不到符合的空間、櫃子或物品。" : "這裡還沒有" + labels[depth] + "。";
+    const message = query ? "找不到符合的空間或物品。" : !current || current.level === 0
+      ? "直接點平面圖上的位置，建立櫃子、床底下等存放空間。"
+      : "這裡還沒有物品，可新增照片或填寫物品名稱。";
     $("list").append(element("p", message, "empty"));
   }
 }
 
-function edit(entry) {
-  if (entry?.level === 0 || (!entry && !current)) return;
-  draft = entry ? { ...entry } : { level: current ? current.level + 1 : 0, parent: current?.id ?? null };
-  const label = labels[draft.level];
+function edit(entry, placement) {
+  if (entry?.level === 0 || (!entry && !current && !placement)) return;
+  if (!entry && !placement && current?.level === 0) return;
+  draft = entry ? { ...entry } : placement ? { ...placement } : { level: 4, parent: current.id };
+  const label = draft.level === 4 ? "物品" : "存放空間";
   $("form").reset();
   $("form-status").textContent = "";
   $("editor-title").textContent = (entry ? "編輯" : "新增") + label;
   $("location").textContent = ancestors(entries.find(parent => parent.id === draft.parent))
     .map(parent => parent.name).join(" / ");
   $("name").value = draft.name ?? "";
-  $("name").placeholder = ["例如 1 樓", "例如 房間 1", "例如 衣櫃", "例如 冬衣箱", "例如 羊毛圍巾"][draft.level];
+  $("name").required = draft.level !== 4;
+  $("name").placeholder = draft.level === 4 ? "例如 羊毛圍巾（有照片時可不填）" : "例如 櫃子、床底下";
+  $("entry-time").textContent = entry ? "建立：" + formatTime(entry.createdAt) + "；更動：" + formatTime(entry.updatedAt) : "儲存時自動記錄建立與更動時間（台北）";
   $("remove").hidden = !entry;
   $("photos").hidden = draft.level !== 4;
   busy(false);
@@ -287,7 +282,8 @@ function closeEditor() {
 $("form").onsubmit = async event => {
   event.preventDefault();
   if ($("save").disabled || !draft || draft.level === 0) return;
-  const name = $("name").value.trim();
+  let name = $("name").value.trim();
+  if (!name && draft.level === 4 && (draft.photo || (draft.hasPhoto && !draft.photoRemoved))) name = "物品照片 " + formatTime(new Date().toISOString());
   if (!name) {
     $("form-status").textContent = "請輸入名稱。";
     $("name").focus();
@@ -302,6 +298,7 @@ $("form").onsubmit = async event => {
     entries = [...entries.filter(entry => entry.id !== saved.id), saved];
     entries.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant", { numeric: true }));
     if (current?.id === saved.id) current = saved;
+    await touchParent(saved.parent);
     closeEditor();
     render();
   } catch (error) {
@@ -324,6 +321,8 @@ $("remove").onclick = async () => {
   try {
     await drive.remove(entry);
     entries = entries.filter(item => item.id !== entry.id);
+    if (current?.id === entry.id) current = entries.find(item => item.id === entry.parent) ?? null;
+    await touchParent(entry.parent);
     closeEditor();
     render();
   } catch (error) {
@@ -333,6 +332,18 @@ $("remove").onclick = async () => {
     busy(false);
   }
 };
+
+async function touchParent(id) {
+  const parent = entries.find(entry => entry.id === id);
+  if (!parent || parent.level === 0) return;
+  try {
+    const updated = await drive.touch(parent);
+    entries = entries.map(entry => entry.id === id ? updated : entry);
+    if (current?.id === id) current = updated;
+  } catch {
+    $("mutation-status").textContent = "物品變更已儲存，但存放空間的更動時間更新失敗，請重新整理確認。";
+  }
+}
 
 function showPhoto(blob = draft?.photo) {
   if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -345,7 +356,7 @@ function showPhoto(blob = draft?.photo) {
 
 function setSignedIn(signedIn) {
   document.querySelector("main").hidden = !signedIn;
-  document.querySelector("footer").hidden = !signedIn;
+  document.querySelector("footer").hidden = !signedIn || $("add").hidden;
   $("gate").hidden = signedIn;
   $("logout").hidden = !signedIn;
   $("add").disabled = !signedIn;

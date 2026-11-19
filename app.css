@@ -78,3 +78,19 @@ dialog::backdrop { background: #172c20a0; }
 .floor-image.floor-3 img { left: -235%; }
 .floor-image.floor-4 img { left: -340%; }
 .plan-original { display: inline-block; padding-block: 12px; color: var(--green); }
+.interactive-plan { width: 100%; overflow: hidden; background: white; }
+.interactive-plan svg { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: manipulation; }
+.interactive-plan.single-plan { max-width: 420px; margin-inline: auto; }
+.storage-marker { cursor: pointer; }
+.storage-marker circle { fill: #244d38; stroke: white; stroke-width: 3; }
+.storage-marker path { fill: none; stroke: white; stroke-width: 2; }
+.storage-marker text { fill: #183d2a; font-size: 17px; font-weight: 700; paint-order: stroke; stroke: white; stroke-width: 5px; stroke-linejoin: round; }
+.storage-marker.active circle, .storage-marker:focus circle { fill: #b45513; stroke: #ffcf73; stroke-width: 5; }
+.changed-time { font-size: .85rem; }
+#entry-time { line-height: 1.7; }
+#mutation-status { color: #a02828; margin-block: 8px; }
+@media (max-width: 600px) {
+  .floor-plans { padding: 12px; }
+  .interactive-plan:not(.single-plan) { overflow-x: auto; }
+  .interactive-plan:not(.single-plan) svg { width: 1000px; max-width: none; }
+}

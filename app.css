@@ -25,6 +25,13 @@ button:disabled { cursor: wait; opacity: .55; }
 .header-storage p { font-size: .8rem; line-height: 1.6; color: var(--muted); }
 .header-storage #retry-quota { padding: 0; min-height: 32px; font-size: .8rem; }
 .account-menu { position: relative; margin-left: auto; align-self: flex-start; margin-top: 16px; }
+#marker-settings { margin-left: auto; align-self: flex-start; margin-top: 16px; font-size: .85rem; white-space: nowrap; }
+#marker-settings:not([hidden]) + .account-menu { margin-left: 0; }
+.marker-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.marker-toggle input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--green); }
+#marker-label-options { min-width: 0; border: 1px solid var(--line); border-radius: 10px; }
+.space-photo-label.label-above { grid-row: 1; }
+.space-photo-label.custom-label { background: #fff; border-color: currentColor; }
 .account-menu > summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #e1ead8; border: 2px solid #b6c9ba; }
 .account-menu > summary::-webkit-details-marker { display: none; }
 .account-menu img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }

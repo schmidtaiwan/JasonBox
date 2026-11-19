@@ -6,26 +6,27 @@
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>收納管家</title>
-  <link rel="icon" href="icon.svg?v=41" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest?v=41">
-  <link rel="stylesheet" href="app.css?v=41">
+  <link rel="icon" href="icon.svg?v=42" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest?v=42">
+  <link rel="stylesheet" href="app.css?v=42">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
-  <script src="drive.js?v=41" defer></script>
-  <script src="appearance.js?v=41" defer></script>
-  <script src="photo.js?v=41" defer></script>
-  <script src="plan.js?v=41" defer></script>
-  <script src="export.js?v=41" defer></script>
-  <script src="app.js?v=41" defer></script>
+  <script src="drive.js?v=42" defer></script>
+  <script src="appearance.js?v=42" defer></script>
+  <script src="photo.js?v=42" defer></script>
+  <script src="plan.js?v=42" defer></script>
+  <script src="export.js?v=42" defer></script>
+  <script src="app.js?v=42" defer></script>
 </head>
 <body>
   <header class="brand">
-    <img src="icon.svg?v=41" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
+    <img src="icon.svg?v=42" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
       <p id="drive-quota" class="page-version" role="status"></p>
       <button id="retry-quota" class="quiet" hidden>重試讀取容量</button></div>
     <section id="header-storage" class="header-storage" hidden aria-label="收納與雲端容量">
       <h1 id="page-title">我的收納</h1><p id="summary"></p>
     </section>
+    <button id="marker-settings" class="secondary" type="button" hidden>圖示設定</button>
     <details id="account-menu" class="account-menu" hidden>
       <summary id="account-toggle" aria-label="登入帳號">
         <img id="account-avatar" alt="" referrerpolicy="no-referrer" hidden><span id="avatar-fallback">G</span>
@@ -40,15 +41,15 @@
     </div>
     <button id="login" class="primary">使用 Google 帳號登入</button>
     <p id="login-status" role="status"></p>
-    <img class="login-photo" src="assets/family.png?v=41" alt="家人在海邊的合照">
+    <img class="login-photo" src="assets/family.png?v=42" alt="家人在海邊的合照">
   </section>
   <main hidden>
     <section id="floor-plans" class="floor-plans" aria-labelledby="floor-heading">
       <h2 id="floor-heading" hidden>四層透天平面圖</h2>
       <div id="floor-tabs" class="floor-tabs" aria-label="選擇樓層"></div>
       <div id="marker-tools" class="marker-tools" role="region" aria-label="調整收納圖示" aria-live="polite" hidden></div>
-      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=41" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
-      <a class="plan-original" href="assets/floor-plans.png?v=41" target="_blank" rel="noopener">查看完整平面圖</a>
+      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=42" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
+      <a class="plan-original" href="assets/floor-plans.png?v=42" target="_blank" rel="noopener">查看完整平面圖</a>
     </section>
     <div class="path-toolbar">
       <nav id="path" aria-label="收納位置"></nav>
@@ -75,6 +76,20 @@
       <button id="back" class="secondary" aria-label="返回" title="返回" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 5-7 7 7 7M3 12h18"/></svg><span>返回</span></button>
     </div>
   </footer>
+  <dialog id="marker-settings-dialog" aria-labelledby="marker-settings-title">
+    <form id="marker-settings-form">
+      <div class="section-title"><h2 id="marker-settings-title">圖示設定</h2><button id="marker-settings-close" type="button" class="quiet" aria-label="關閉">✕</button></div>
+      <label class="marker-toggle"><input type="checkbox" id="markers-only">僅顯示圖示</label>
+      <label class="marker-toggle"><input type="checkbox" id="markers-transparent">所有有照片的圖示使用透明底</label>
+      <fieldset id="marker-label-options">
+        <legend>標記文字</legend>
+        <label class="field">大小<select id="marker-label-size"><option value="small">小</option><option value="normal">中</option><option value="large">大</option><option value="xlarge">特大</option></select></label>
+        <label class="field">位置<select id="marker-label-position"><option value="above">圖示上方</option><option value="below">圖示下方</option></select></label>
+        <label class="marker-toggle">顏色<input id="marker-label-color" type="color" value="#183d2a"></label>
+      </fieldset>
+      <div class="editor-actions"><button class="primary">儲存</button></div>
+    </form>
+  </dialog>
   <dialog id="move-dialog" aria-labelledby="move-title">
     <form id="move-form">
       <div class="section-title"><h2 id="move-title">移動物品</h2><button type="button" id="move-close" class="quiet" aria-label="關閉">✕</button></div>

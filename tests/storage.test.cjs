@@ -347,6 +347,23 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(get('move-dialog').open, false);
   assert.deepEqual(records.filter(record => record.parent === 'right').map(record => record.id).sort(), ['move-a', 'move-b']);
   assert.equal(records.find(record => record.id === 'stay').parent, 'left');
+  get('marker-settings').onclick();
+  get('markers-transparent').checked = true;
+  get('marker-label-size').value = 'large';
+  get('marker-label-position').value = 'above';
+  get('marker-label-color').value = '#842743';
+  get('marker-settings-form').onsubmit({ preventDefault() {} });
+  assert.equal(run('markerIconEntry({hasPhoto:true, iconKey:"bed"}).iconKey'), 'photo-only');
+  run('navigate(null)');
+  const label = get('floor-image').children[0].children.find(node => node.attrs.role === 'button').children.at(-1);
+  assert.equal(label.attrs.y, -25);
+  assert.equal(label.style.fill, '#842743');
+  assert.equal(label.style.fontSize, '21.25px');
+  get('marker-settings').onclick();
+  get('markers-only').checked = true;
+  get('marker-settings-form').onsubmit({ preventDefault() {} });
+  const iconsOnly = get('floor-image').children[0].children.find(node => node.attrs.role === 'button');
+  assert.ok(!iconsOnly.children.some(node => node.attrs['text-anchor']));
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

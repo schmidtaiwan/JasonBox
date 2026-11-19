@@ -1,8 +1,17 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 41;
+const PAGE_BUILD = 42;
 const PAGE_DATE = "2026-11-19";
+const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
+const markerSettingsKey = "jasonbox-marker-settings";
+let markerSettings = { iconsOnly: false, transparent: false, size: "normal", position: "below", color: "#183d2a" };
+try {
+  const preferences = JSON.parse(localStorage.getItem(markerSettingsKey));
+  if (preferences && Object.hasOwn(markerSizes, preferences.size) && /^#[0-9a-f]{6}$/i.test(preferences.color)) {
+    markerSettings = { ...markerSettings, ...preferences };
+  }
+} catch {}
 const $ = id => document.getElementById(id);
 const editor = $("editor");
 const updateDialog = $("update-dialog");
@@ -799,6 +808,7 @@ async function refreshQuota() {
 
 function setSignedIn(value) {
   signedIn = value;
+  $("marker-settings").hidden = !signedIn;
   document.querySelector("main").hidden = !signedIn;
   document.querySelector("footer").hidden = !signedIn;
   $("gate").hidden = signedIn;
@@ -830,6 +840,32 @@ function setSignedIn(value) {
     void refreshQuota();
   }
 }
+
+$("marker-settings").onclick = () => {
+  $("markers-only").checked = markerSettings.iconsOnly;
+  $("markers-transparent").checked = markerSettings.transparent;
+  $("marker-label-size").value = markerSettings.size;
+  $("marker-label-position").value = markerSettings.position;
+  $("marker-label-color").value = markerSettings.color;
+  $("marker-label-options").disabled = markerSettings.iconsOnly;
+  $("marker-settings-dialog").showModal();
+};
+$("markers-only").onchange = () => { $("marker-label-options").disabled = $("markers-only").checked; };
+$("marker-settings-close").onclick = () => $("marker-settings-dialog").close();
+$("marker-settings-form").onsubmit = event => {
+  event.preventDefault();
+  const size = $("marker-label-size").value;
+  const position = $("marker-label-position").value;
+  const color = $("marker-label-color").value;
+  if (!Object.hasOwn(markerSizes, size) || !/^#[0-9a-f]{6}$/i.test(color)) return;
+  markerSettings = {
+    iconsOnly: $("markers-only").checked, transparent: $("markers-transparent").checked,
+    size, position: position === "above" ? "above" : "below", color
+  };
+  try { localStorage.setItem(markerSettingsKey, JSON.stringify(markerSettings)); } catch {}
+  $("marker-settings-dialog").close();
+  render();
+};
 
 $("retry-quota").onclick = refreshQuota;
 $("account-avatar").onerror = () => {

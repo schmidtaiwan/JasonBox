@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=41", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=42", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -185,17 +185,23 @@ function renderFloorPlans(query) {
       role: "button", tabindex: "0", "aria-label": "開啟存放空間：" + entry.name,
       class: "storage-marker" + (entry.id === current?.id ? " active" : "") + (entry.id === planAdjustment?.id ? " adjusting" : "")
     });
-    const appearance = spaceAppearance(entry);
+    const iconEntry = markerIconEntry(entry);
+    const appearance = spaceAppearance(iconEntry);
     const circle = svgNode("circle", { r: 19 });
     const photoOnly = appearance.icon[0] === "photo-only";
     circle.style.fill = photoOnly ? "transparent" : appearance.color;
     if (photoOnly) circle.style.stroke = "none";
     marker.append(circle);
     if (!photoOnly) marker.append(svgNode("path", { d: appearance.icon[2] }));
-    if (photoOnly || appearance.icon[0] === "photo") addPhotoThumbnail(marker, entry, photoOnly ? 38 : 28, photoOnly);
-    const text = svgNode("text", { y: 37, "text-anchor": "middle" });
-    text.textContent = entry.name;
-    marker.append(text);
+    if (photoOnly || appearance.icon[0] === "photo") addPhotoThumbnail(marker, iconEntry, photoOnly ? 38 : 28, photoOnly);
+    if (!markerSettings.iconsOnly) {
+      const size = 17 * markerSizes[markerSettings.size];
+      const text = svgNode("text", { y: markerSettings.position === "above" ? -25 : 24 + size * .76, "text-anchor": "middle" });
+      text.textContent = entry.name;
+      text.style.fontSize = size + "px";
+      text.style.fill = markerSettings.color;
+      marker.append(text);
+    }
     const open = event => { event.stopPropagation(); navigate(entry); };
     marker.onclick = open;
     marker.onkeydown = event => {
@@ -216,6 +222,10 @@ function renderFloorPlans(query) {
     return tab;
   }), button("ALL", number ? "floor-tab" : "floor-tab selected", () => navigate(null)));
   renderAdjustmentTools();
+}
+
+function markerIconEntry(entry) {
+  return markerSettings.transparent && (entry.hasPhoto || entry.photo) ? { ...entry, iconKey: "photo-only" } : entry;
 }
 
 
@@ -325,9 +335,20 @@ function renderSpaceLayout(query) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
     const iconHost = element("span", "", "space-photo-icon");
-    if (spaceAppearance(position).icon[0] === "photo-only") iconHost.classList.add("photo-only");
-    iconHost.append(spaceIconNode(position));
-    marker.append(iconHost, element("span", position.name, "space-photo-label"));
+    const iconEntry = markerIconEntry(position);
+    if (spaceAppearance(iconEntry).icon[0] === "photo-only") iconHost.classList.add("photo-only");
+    iconHost.append(spaceIconNode(iconEntry));
+    marker.append(iconHost);
+    if (!markerSettings.iconsOnly) {
+      const label = element("span", position.name, "space-photo-label");
+      label.style.fontSize = .85 * markerSizes[markerSettings.size] + "rem";
+      if (markerSettings.position === "above") label.classList.add("label-above");
+      if (markerSettings.color !== "#183d2a") {
+        label.classList.add("custom-label");
+        label.style.color = markerSettings.color;
+      }
+      marker.append(label);
+    }
     marker.setAttribute("data-tone", "dark");
     const appearance = { marker, value: position };
     markers.push(appearance);

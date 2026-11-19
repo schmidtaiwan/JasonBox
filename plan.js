@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=50", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=51", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -261,6 +261,15 @@ function addResizableSpacePhoto(host, canvas, image, spaceId) {
   handle.setAttribute("aria-valuemax", String(maximum));
   let height;
   let drag;
+  const showFullPhoto = () => {
+    height = undefined;
+    viewport.style.maxHeight = "none";
+    viewport.style.height = "";
+    canvas.style.minWidth = "";
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
+    handle.removeAttribute("aria-valuenow");
+  };
   const fitPhoto = () => {
     if (!height || !image.naturalWidth || !image.naturalHeight) return;
     canvas.style.minWidth = Math.ceil(height * image.naturalWidth / image.naturalHeight) + "px";
@@ -277,8 +286,9 @@ function addResizableSpacePhoto(host, canvas, image, spaceId) {
     try { localStorage.setItem(key, String(height)); } catch {}
   };
   try {
-    const saved = Number(localStorage.getItem(key));
-    if (Number.isInteger(saved) && saved >= minimum && saved <= maximum) resize(saved);
+    const saved = localStorage.getItem(key);
+    if (saved === "fit") showFullPhoto();
+    else if (Number.isInteger(Number(saved)) && Number(saved) >= minimum && Number(saved) <= maximum) resize(Number(saved));
   } catch {}
   handle.onpointerdown = event => {
     if (drag || event.button !== 0) return;
@@ -300,7 +310,12 @@ function addResizableSpacePhoto(host, canvas, image, spaceId) {
     save();
   };
   viewport.append(canvas);
-  host.append(viewport, handle);
+  const controls = element("div", "", "space-photo-frame-controls");
+  controls.append(handle, button("顯示全圖", "quiet", () => {
+    showFullPhoto();
+    try { localStorage.setItem(key, "fit"); } catch {}
+  }));
+  host.append(viewport, controls);
   return fitPhoto;
 }
 
@@ -340,15 +355,20 @@ function renderSpaceLayout(query) {
       }
     }).catch(() => {});
   }
-  const displayPoint = value => {
+  const imagePoint = value => {
     const x = Number.isFinite(value.photoX) ? value.photoX : .5;
     const y = Number.isFinite(value.photoY) ? value.photoY : .5;
     return space.coverTransform ? photoPoint(space.coverTransform, x, y) : [x, y];
   };
+  const outsidePhoto = ([x, y]) => x < 0 || x > 1 || y < 0 || y > 1;
+  const displayPoint = value => {
+    const [x, y] = imagePoint(value);
+    return [x, y].map(coordinate => Math.max(.05, Math.min(.95, coordinate)));
+  };
   let samples;
   const markers = [];
   const recolor = (marker, value) => {
-    if (!samples || marker.hidden) return;
+    if (!samples) return;
     const [displayX, displayY] = displayPoint(value);
     const x = Math.round(displayX * (samples.width - 1));
     const y = Math.round(displayY * (samples.height - 1));
@@ -389,7 +409,8 @@ function renderSpaceLayout(query) {
     const [photoX, photoY] = space.coverTransform ? inversePhotoPoint(space.coverTransform, x, y) : [x, y];
     return { photoX, photoY };
   };
-  for (const position of entries.filter(entry => entry.parent === space.id && entry.level !== 4)) {
+  const positions = entries.filter(entry => entry.parent === space.id && entry.level !== 4);
+  for (const position of positions) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
     const iconHost = element("span", "", "space-photo-icon");
@@ -412,7 +433,6 @@ function renderSpaceLayout(query) {
     markers.push(appearance);
     const place = value => {
       const [x, y] = displayPoint(value);
-      marker.hidden = x < 0 || x > 1 || y < 0 || y > 1;
       marker.style.left = x * 100 + "%";
       marker.style.top = y * 100 + "%";
       appearance.value = value;
@@ -452,6 +472,14 @@ function renderSpaceLayout(query) {
     };
     marker.onpointercancel = () => { drag = null; suppressClick = true; place(position); };
     canvas.append(marker);
+  }
+  const croppedPositions = positions.filter(position => outsidePhoto(imagePoint(position)));
+  if (croppedPositions.length) {
+    const shortcuts = element("nav", "", "cropped-position-links");
+    shortcuts.setAttribute("aria-label", "原位置超出照片裁切範圍的空間");
+    shortcuts.append(element("span", "原位置超出裁切範圍：", "muted"),
+      ...croppedPositions.map(position => button(position.name, "secondary", () => navigate(position))));
+    host.append(shortcuts);
   }
   host.append(element("p", space.level < 3 ? "按下方「加入」新增內部位置；拖曳圖示調整位置，點圖示查看內容。" : "點圖示查看內容。", "muted"));
 }

@@ -103,6 +103,8 @@ const drive = (() => {
       iconKey: file.appProperties?.iconKey,
       iconColor: file.appProperties?.iconColor,
       photoId: file.appProperties?.spacePhotoId,
+      spaceAlbum: file.appProperties?.spaceAlbum === "1",
+      coverTransform: file.appProperties?.coverTransform?.split(",").map(Number),
       photoX: file.appProperties?.photoX === undefined ? undefined : Number(file.appProperties.photoX),
       photoY: file.appProperties?.photoY === undefined ? undefined : Number(file.appProperties.photoY),
       hasPhoto,
@@ -173,25 +175,51 @@ const drive = (() => {
       metadata.parents = [parentId];
     }
     if (level < 4) {
-      if (["cabinet", "bed", "box", "shelf", "drawer", "closet", "bag", "home", "photo"].includes(record.iconKey)) metadata.appProperties.iconKey = record.iconKey;
+      if (["cabinet", "bed", "box", "shelf", "drawer", "closet", "bag", "home", "photo", "photo-only"].includes(record.iconKey)) metadata.appProperties.iconKey = record.iconKey;
       if (/^#[0-9a-f]{6}$/i.test(record.iconColor || "")) metadata.appProperties.iconColor = record.iconColor;
       if (!id && photo) {
-        const created = await write({ ...metadata, mimeType: folder });
-        return save({ ...record, id: created.id });
+        if (!record.createdFolderId) {
+          const created = await write({ ...metadata, mimeType: folder });
+          record.createdFolderId = created.id;
+        }
+        const nested = { ...record, id: record.createdFolderId };
+        try { return await save(nested); }
+        finally { record.uploadedCoverId = nested.uploadedCoverId; }
       }
       if (["區", "格", "層"].includes(record.positionType)) metadata.appProperties.positionType = record.positionType;
       if (Number.isFinite(record.photoX) && Number.isFinite(record.photoY)) {
         metadata.appProperties.photoX = String(record.photoX);
         metadata.appProperties.photoY = String(record.photoY);
       }
-      if (photo) {
-        const photoMetadata = { name: ".space-photo.jpg", mimeType: "image/jpeg" };
-        if (!record.photoId) photoMetadata.parents = [id || parent || root];
-        const uploaded = await write(photoMetadata, record.photoId, photo, "image/jpeg");
-        metadata.appProperties.spacePhotoId = uploaded.id;
-      } else if (photoRemoved) {
+      if (photoRemoved && id) {
+        if (!record.removedOldPhotos) {
+          const album = record.spaceAlbum ? await spacePhotos(id) : [];
+          for (const file of album) await write({ trashed: true }, file.id);
+          if (record.photoId) await write({ trashed: true }, record.photoId);
+          record.removedOldPhotos = true;
+        }
         metadata.appProperties.spacePhotoId = null;
+        metadata.appProperties.spaceAlbum = null;
+        metadata.appProperties.coverTransform = null;
       }
+      if (photo && (!record.photoId || record.replaceCover || photoRemoved)) {
+        const photoMetadata = { name: ".space-photo.jpg", mimeType: "image/jpeg" };
+        const coverId = photoRemoved ? undefined : record.photoId;
+        if (!coverId) photoMetadata.parents = [id];
+        if (!record.uploadedCoverId) record.uploadedCoverId = (await write(photoMetadata, coverId, photo, "image/jpeg")).id;
+        metadata.appProperties.spacePhotoId = record.uploadedCoverId;
+        if (record.coverTransform) metadata.appProperties.coverTransform = record.coverTransform
+          .map(value => Number(value.toPrecision(8))).join(",");
+      }
+      for (const extra of record.extraPhotos || []) {
+        if (extra.id) continue;
+        const uploaded = await write({
+          name: (extra.name || "空間照片") + ".jpg", ...(!extra.targetId && { parents: [id] }), mimeType: "image/jpeg",
+          appProperties: { jasonBoxSpacePhoto: "1" }
+        }, extra.targetId, extra.photo, "image/jpeg");
+        extra.id = uploaded.id;
+      }
+      if (record.extraPhotos?.length) metadata.appProperties.spaceAlbum = "1";
       if (!id) metadata.mimeType = folder;
       return entryFromFile(await write(metadata, id), level);
     }
@@ -205,10 +233,15 @@ const drive = (() => {
   }
 
   async function remove(entry) {
-    if (entry.level < 4 && (await list("'" + entry.id + "' in parents")).some(file => file.id !== entry.photoId)) {
+    if (entry.level < 4 && (await list("'" + entry.id + "' in parents")).some(file =>
+      file.id !== entry.photoId && file.appProperties?.jasonBoxSpacePhoto !== "1")) {
       throw new Error("請先清空這個 Google Drive 資料夾，再刪除。");
     }
     await write({ trashed: true }, entry.id);
+  }
+
+  function spacePhotos(id) {
+    return list("'" + id + "' in parents and appProperties has { key='jasonBoxSpacePhoto' and value='1' }");
   }
 
   async function photo(id) {
@@ -227,5 +260,5 @@ const drive = (() => {
     return data.storageQuota;
   }
 
-  return { login, logout, readEntries, save, remove, photo, touch, quota, account: () => accountInfo, SessionExpired };
+  return { login, logout, readEntries, save, remove, photo, spacePhotos, touch, quota, account: () => accountInfo, SessionExpired };
 })();

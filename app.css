@@ -77,6 +77,9 @@ dialog::backdrop { background: #172c20a0; }
 .field input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-height: 44px; }
 #preview { width: 100%; max-height: 37dvh; object-fit: contain; border-radius: 12px; background: #e7eddf; }
 .photo-controls, .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.editor-submit { flex-wrap: nowrap; }
+.editor-submit .primary { flex: 1; }
+.editor-secondary:not(:has(button:not([hidden]))) { display: none; }
 .photo-button { position: relative; overflow: hidden; display: inline-flex; align-items: center; padding: 9px 12px; min-height: 44px; border-radius: 10px; background: #e7eddf; cursor: pointer; }
 .photo-button:focus-within { outline: 3px solid #518469; }
 .photo-button input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
@@ -146,6 +149,11 @@ dialog::backdrop { background: #172c20a0; }
 
 .batch-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .batch-preview .thumb { width: 72px; height: 72px; object-fit: contain; }
+.batch-preview button { padding: 0; border: 0; background: transparent; }
+#photo-canvas { display: block; max-width: 100%; max-height: 36dvh; margin: 12px auto; object-fit: contain; }
+.crop-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.crop-controls label { display: grid; gap: 4px; }
+.crop-controls input { width: 100%; }
 
 footer { z-index: 20; }
 .footer-actions { display: flex; gap: 12px; }
@@ -186,6 +194,7 @@ footer { z-index: 20; }
 .appearance-choice[aria-pressed="true"], .color-choice[aria-pressed="true"] { outline: 3px solid #111; outline-offset: 1px; }
 .color-choice { min-height: 44px; border: 2px solid white; border-radius: 10px; color: white; font-weight: 700; }
 .space-photo-icon .space-choice-icon { width: 32px; height: 32px; }
+.space-photo-marker .space-photo-icon.photo-only { background: transparent; border-color: transparent; box-shadow: none; }
 
 .current-space-icon { margin-left: 0; width: 48px; height: 48px; padding: 2px; flex: 0 0 48px; border: 0; background: transparent; }
 .current-space-icon .space-choice-icon { width: 44px; height: 44px; }

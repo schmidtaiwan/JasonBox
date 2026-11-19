@@ -176,7 +176,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=37", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=38", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -187,9 +187,12 @@ function renderFloorPlans(query) {
     });
     const appearance = spaceAppearance(entry);
     const circle = svgNode("circle", { r: 19 });
-    circle.style.fill = appearance.color;
-    marker.append(circle, svgNode("path", { d: appearance.icon[2] }));
-    if (appearance.icon[0] === "photo") addPhotoThumbnail(marker, entry, 28);
+    const photoOnly = appearance.icon[0] === "photo-only";
+    circle.style.fill = photoOnly ? "transparent" : appearance.color;
+    if (photoOnly) circle.style.stroke = "none";
+    marker.append(circle);
+    if (!photoOnly) marker.append(svgNode("path", { d: appearance.icon[2] }));
+    if (photoOnly || appearance.icon[0] === "photo") addPhotoThumbnail(marker, entry, photoOnly ? 38 : 28);
     const text = svgNode("text", { y: 37, "text-anchor": "middle" });
     text.textContent = entry.name;
     marker.append(text);
@@ -242,7 +245,7 @@ function renderSpaceLayout(query) {
   if (host.hidden) return;
   const space = current;
   host.append(element("h2", space.name + "的位置圖"));
-  const upload = button(space.hasPhoto ? "更換空間照片" : "上傳空間照片", "quiet", () => edit(space));
+  const upload = button(space.hasPhoto ? "管理空間照片" : "上傳空間照片", "quiet", () => edit(space));
   upload.disabled = photoUploads.has(space.id);
   host.append(upload);
   if (uploadStatus(space)) host.append(button(uploadStatus(space), "quiet", () => openItem(space)));
@@ -255,12 +258,33 @@ function renderSpaceLayout(query) {
   image.alt = space.name + "的照片";
   canvas.append(image);
   host.append(canvas);
+  if (space.spaceAlbum) {
+    const gallery = element("div", "", "batch-preview");
+    host.append(gallery);
+    drive.spacePhotos(space.id).then(files => {
+      if (generation !== spaceLayoutGeneration) return;
+      for (const file of files) {
+        const tile = button("", "", () => edit(space));
+        tile.setAttribute("aria-label", "管理照片：" + file.name);
+        const placeholder = element("span", "照片", "thumb");
+        tile.append(placeholder);
+        gallery.append(tile);
+        displayThumbnail(placeholder, { ...file, hasPhoto: true });
+      }
+    }).catch(() => {});
+  }
+  const displayPoint = value => {
+    const x = Number.isFinite(value.photoX) ? value.photoX : .5;
+    const y = Number.isFinite(value.photoY) ? value.photoY : .5;
+    return space.coverTransform ? photoPoint(space.coverTransform, x, y) : [x, y];
+  };
   let samples;
   const markers = [];
   const recolor = (marker, value) => {
-    if (!samples) return;
-    const x = Math.round((Number.isFinite(value.photoX) ? value.photoX : .5) * (samples.width - 1));
-    const y = Math.round((Number.isFinite(value.photoY) ? value.photoY : .5) * (samples.height - 1));
+    if (!samples || marker.hidden) return;
+    const [displayX, displayY] = displayPoint(value);
+    const x = Math.round(displayX * (samples.width - 1));
+    const y = Math.round(displayY * (samples.height - 1));
     const left = Math.max(0, x - 8), top = Math.max(0, y - 8);
     const pixels = samples.context.getImageData(left, top, Math.min(17, samples.width - left), Math.min(17, samples.height - top)).data;
     marker.setAttribute("data-tone", markerTone(pixels));
@@ -292,23 +316,26 @@ function renderSpaceLayout(query) {
   });
   const pointAt = event => {
     const rect = canvas.getBoundingClientRect();
-    return {
-      photoX: Math.min(.97, Math.max(.03, (event.clientX - rect.left) / rect.width)),
-      photoY: Math.min(.97, Math.max(.03, (event.clientY - rect.top) / rect.height))
-    };
+    const x = Math.min(.97, Math.max(.03, (event.clientX - rect.left) / rect.width));
+    const y = Math.min(.97, Math.max(.03, (event.clientY - rect.top) / rect.height));
+    const [photoX, photoY] = space.coverTransform ? inversePhotoPoint(space.coverTransform, x, y) : [x, y];
+    return { photoX, photoY };
   };
   for (const position of entries.filter(entry => entry.parent === space.id && entry.level !== 4)) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
     const iconHost = element("span", "", "space-photo-icon");
+    if (position.iconKey === "photo-only") iconHost.classList.add("photo-only");
     iconHost.append(spaceIconNode(position));
     marker.append(iconHost, element("span", position.name, "space-photo-label"));
     marker.setAttribute("data-tone", "dark");
     const appearance = { marker, value: position };
     markers.push(appearance);
     const place = value => {
-      marker.style.left = (Number.isFinite(value.photoX) ? value.photoX : .5) * 100 + "%";
-      marker.style.top = (Number.isFinite(value.photoY) ? value.photoY : .5) * 100 + "%";
+      const [x, y] = displayPoint(value);
+      marker.hidden = x < 0 || x > 1 || y < 0 || y > 1;
+      marker.style.left = x * 100 + "%";
+      marker.style.top = y * 100 + "%";
       appearance.value = value;
       recolor(marker, value);
     };

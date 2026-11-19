@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 37;
+const PAGE_BUILD = 38;
 const PAGE_DATE = "2026-11-19";
 const $ = id => document.getElementById(id);
 const editor = $("editor");
@@ -22,6 +22,9 @@ let navigationHistory = [];
 let draft;
 let objectUrls = [];
 let previewUrl;
+let editorCover;
+let savedAlbum = [];
+let editorPhotoUrls = [];
 let photoVersion = 0;
 let saving = false;
 let pendingUpdate;
@@ -69,14 +72,15 @@ const thumbnails = new IntersectionObserver(changes => {
   }
 });
 
-async function refresh() {
+async function refresh({ initial = false } = {}) {
   entries = (await drive.readEntries()).filter(entry => !photoUploads.has(entry.id));
   entries.push(...Array.from(photoUploads.values(), job => job.local));
   for (let floor = 1; floor <= 4; floor++) {
     const existing = entries.find(entry => entry.level === 0 && floorNumber(entry.name) === floor);
     if (!existing) entries.push(await drive.save({ name: floor + "F", level: 0, parent: null }));
   }
-  if (current) current = entries.find(entry => entry.id === current.id) ?? null;
+  if (initial) current = entries.find(entry => entry.level === 0 && floorNumber(entry.name) === 1) ?? null;
+  else if (current) current = entries.find(entry => entry.id === current.id) ?? null;
   render();
 }
 
@@ -149,12 +153,12 @@ function displayThumbnail(placeholder, entry) {
   }
 }
 
-function queueSelectedPhotos(record, name) {
+function queueSelectedPhotos(record, name, names = []) {
   const photos = record.photos || [{ photo: record.photo }];
   for (const [index, item] of photos.entries()) {
     const { photos: unused, ...single } = record;
     single.photo = item.photo;
-    single.name = photos.length === 1 ? record.name : name ? name + " " + (index + 1) : item.name || record.name + " " + (index + 1);
+    single.name = names[index] || (photos.length === 1 ? record.name : name ? name + " " + (index + 1) : item.name || record.name + " " + (index + 1));
     queuePhotoUpload(single);
   }
 }
@@ -187,6 +191,12 @@ async function sendPhotoUpload(job) {
       job.record.photo = await compress(job.record.photo);
       job.record.compressPhoto = false;
     }
+    for (const extra of job.record.extraPhotos || []) {
+      if (!extra.prepared) {
+        extra.photo = await compress(extra.photo);
+        extra.prepared = true;
+      }
+    }
     const saved = await drive.save(job.record);
     entries = entries.filter(entry => entry.id !== job.id).map(entry =>
       entry.parent === job.id ? { ...entry, parent: saved.id } : entry).concat(saved);
@@ -199,6 +209,7 @@ async function sendPhotoUpload(job) {
     navigationHistory = navigationHistory.map(previous => previous.id === job.id ? { ...previous, id: saved.id } : previous);
     photoUploads.delete(job.id);
     if (current?.id === job.id) current = saved;
+    if (signedIn && (job.record.photo || job.record.extraPhotos?.length)) void refreshQuota();
     await touchParent(saved.parent);
   } catch (error) {
     job.failed = true;
@@ -343,8 +354,9 @@ function edit(entry, placement) {
     return option;
   }));
   $("add-kind").value = draft.level === 4 ? "item" : draft.level === 1 ? "space" : "position";
-  $("gallery").multiple = !draft.id && draft.level === 4;
-  $("batch-preview").replaceChildren();
+  $("gallery").multiple = draft.level < 4 || !draft.id;
+  editorCover = undefined;
+  savedAlbum = [];
   $("position-type").value = draft.positionType || "區";
   $("form-status").textContent = "";
   $("editor-title").textContent = (entry ? "編輯" : "新增") + label;
@@ -352,7 +364,8 @@ function edit(entry, placement) {
     .map(parent => parent.name).join(" / ");
   $("name").value = draft.name ?? "";
   $("name").required = draft.level !== 4;
-  $("name").placeholder = draft.level === 4 ? "例如 羊毛圍巾（有照片時可不填）" : isPosition ? "例如 左區、第 2 格、上層" : "例如 櫃子、床底下";
+  $("name").maxLength = !draft.id && draft.level === 4 ? 1000 : 80;
+  $("name").placeholder = draft.level === 4 ? (draft.id ? "例如 羊毛圍巾" : "例如 圍巾、帽子（以空格或逗號分隔）") : isPosition ? "例如 左區、第 2 格、上層" : "例如 櫃子、床底下";
   $("entry-time").textContent = entry ? "建立：" + formatTime(entry.createdAt) + "；更動：" + changeDescription(entry) : "儲存時自動記錄建立與更動時間（台北）";
   $("remove").hidden = !entry;
   $("photos").hidden = draft.level === 0;
@@ -364,10 +377,21 @@ function edit(entry, placement) {
     $("form-status").textContent = "正在載入照片…";
     drive.photo(entry.photoId || entry.id).then(blob => {
       if (version !== photoVersion || !editor.open) return;
-      showPhoto(blob);
+      editorCover = blob;
+      showPhoto();
       $("form-status").textContent = "";
     }).catch(error => {
       if (version === photoVersion && editor.open) showError(error);
+    });
+  }
+  if (entry?.spaceAlbum) {
+    const activeDraft = draft;
+    drive.spacePhotos(entry.id).then(files => {
+      if (draft !== activeDraft || draft.photoRemoved) return;
+      savedAlbum = files;
+      showPhoto();
+    }).catch(error => {
+      if (draft === activeDraft) showError(error);
     });
   }
 }
@@ -404,22 +428,15 @@ async function pickPhoto(event) {
   const file = files[0];
   event.target.value = "";
   if (!file) return;
-  photoVersion++;
-  const photos = (draft.id || draft.level !== 4 ? files.slice(0, 1) : files)
+  if (!draft) return;
+  if (draft.level === 4) photoVersion++;
+  const multiple = draft.level < 4 || !draft.id;
+  const photos = (multiple ? files : files.slice(0, 1))
     .map(selected => ({ photo: selected, name: selected.name.replace(/\.[^.]+$/, "") }));
-  draft.photo = photos[0].photo;
-  draft.photos = photos;
-  draft.compressPhoto = true;
-  draft.photoRemoved = false;
+  draft.photos = multiple ? [...(draft.photos || []), ...photos] : photos;
+  if (draft.level === 4) draft.photoRemoved = false;
   showPhoto();
-  $("batch-preview").replaceChildren(...photos.slice(1).map(item => {
-    const image = element("img", "", "thumb");
-    image.alt = item.name;
-    image.src = URL.createObjectURL(item.photo);
-    objectUrls.push(image.src);
-    return image;
-  }));
-  $("form-status").textContent = photos.length > 1 ? "已選擇 " + photos.length + " 張照片，儲存後於背景處理及上傳。" : "儲存後於背景處理及上傳照片。";
+  $("form-status").textContent = "已選擇 " + draft.photos.length + " 張照片，儲存後於背景上傳。";
   busy(false);
 }
 
@@ -427,9 +444,11 @@ $("camera").onchange = pickPhoto;
 $("gallery").onchange = pickPhoto;
 $("remove-photo").onclick = () => {
   photoVersion++;
-  delete draft.photo;
   delete draft.photos;
-  $("batch-preview").replaceChildren();
+  delete draft.editedCover;
+  delete draft.coverTransform;
+  savedAlbum = [];
+  editorCover = undefined;
   draft.photoRemoved = true;
   $("form-status").textContent = "";
   busy(false);
@@ -499,6 +518,8 @@ function closeEditor() {
   editor.close();
   photoVersion++;
   draft = undefined;
+  editorCover = undefined;
+  savedAlbum = [];
   showPhoto();
   showUpdatePrompt();
 }
@@ -506,23 +527,54 @@ $("form").onsubmit = async event => {
   event.preventDefault();
   if ($("save").disabled || !draft || draft.level === 0) return;
   let name = $("name").value.trim();
-  if (!name && draft.level === 4 && (draft.photo || (draft.hasPhoto && !draft.photoRemoved))) name = "物品照片 " + formatTime(new Date().toISOString());
+  const enteredName = name;
+  const names = !draft.id && draft.level === 4 ? name.split(/[\s,，、]+/u).filter(Boolean) : [];
+  if (!draft.id && draft.level === 4) name = names[0] || "";
+  const photos = draft.photos || [];
+  if (!name && draft.level === 4 && (photos.length || draft.editedCover || (draft.hasPhoto && !draft.photoRemoved))) name = "物品照片 " + formatTime(new Date().toISOString());
   if (!name) {
     $("form-status").textContent = "請輸入名稱。";
     $("name").focus();
     return;
   }
   const record = { ...draft, name };
+  delete record.editedCover;
   const parent = entries.find(entry => entry.id === record.parent);
   if (!record.id && record.level === 4 && parent?.level === 0) {
     $("form-status").textContent = "樓層只能新增空間，請先進入空間再加入物品。";
     return;
   }
   if (record.level > 1 && record.level < 4) record.positionType = $("position-type").value;
-  if (record.photo) {
-    queueSelectedPhotos(record, $("name").value.trim());
+  if (names.some(value => value.length > 80) || (names.length > 1 && photos.length && names.length !== photos.length)) {
+    $("form-status").textContent = names.some(value => value.length > 80)
+      ? "每個物品名稱最多 80 個字。" : "請讓物品名稱和照片張數相同，以便依序配對。";
     return;
   }
+  if (record.level === 4 && photos.length) {
+    record.photo = photos[0].photo;
+    record.compressPhoto = true;
+    queueSelectedPhotos(record, enteredName, names.length > 1 ? names : []);
+    return;
+  }
+  delete record.photos;
+  if (names.length > 1) {
+    for (const itemName of names) queuePhotoUpload({ ...record, name: itemName });
+    return;
+  }
+  if (record.level < 4) {
+    const hasCover = record.photoId && !record.photoRemoved;
+    record.photo = draft.editedCover || (!hasCover ? photos[0]?.photo : undefined);
+    record.replaceCover = Boolean(draft.editedCover);
+    record.extraPhotos = [
+      ...photos.slice(!hasCover && !draft.editedCover ? 1 : 0),
+      ...savedAlbum.filter(file => file.editedPhoto).map(file => ({
+        name: file.name.replace(/\.jpg$/i, ""), targetId: file.id, photo: file.editedPhoto, prepared: true
+      }))
+    ];
+  } else {
+    record.photo = draft.editedCover;
+  }
+  record.compressPhoto = Boolean(record.photo && !draft.editedCover);
   queuePhotoUpload(record);
 };
 $("remove").onclick = async () => {
@@ -562,13 +614,57 @@ async function touchParent(id) {
   }
 }
 
-function showPhoto(blob = draft?.photo) {
+function showPhoto() {
   if (previewUrl) URL.revokeObjectURL(previewUrl);
+  for (const url of editorPhotoUrls) URL.revokeObjectURL(url);
+  editorPhotoUrls = [];
+  const photos = draft?.photos || [];
+  const cover = draft?.editedCover || (draft?.level === 4 && photos.length ? undefined : editorCover);
+  const blob = cover || photos[0]?.photo;
   previewUrl = blob ? URL.createObjectURL(blob) : undefined;
   $("preview").hidden = !previewUrl;
+  $("edit-photo").hidden = !blob;
   $("remove-photo").hidden = !blob && !(draft?.hasPhoto && !draft.photoRemoved);
   if (previewUrl) $("preview").src = previewUrl;
   else $("preview").removeAttribute("src");
+  const tiles = photos.slice(cover ? 0 : 1).map(item => {
+    const tile = button("", "", () => openPhotoTools(item.photo, result => { item.photo = result; }));
+    const image = element("img", "", "thumb");
+    image.alt = "旋轉或裁切 " + (item.name || "照片");
+    image.src = URL.createObjectURL(item.photo);
+    editorPhotoUrls.push(image.src);
+    tile.append(image);
+    return tile;
+  });
+  for (const file of savedAlbum) {
+    const tile = button(file.name.replace(/\.jpg$/i, ""), "quiet", () => {
+      const activeDraft = draft;
+      (file.editedPhoto ? Promise.resolve(file.editedPhoto) : drive.photo(file.id)).then(blob => {
+        if (draft !== activeDraft) return;
+        return openPhotoTools(blob, result => {
+          file.editedPhoto = result;
+        });
+      }).catch(error => { if (draft === activeDraft) showError(error); });
+    });
+    tiles.push(tile);
+  }
+  $("batch-preview").replaceChildren(...tiles);
+  $("edit-photo").onclick = () => openPhotoTools(blob, (result, transform) => {
+    if (cover) {
+      draft.editedCover = result;
+      if (draft.level < 4) draft.coverTransform = combinePhotoTransforms(transform, draft.coverTransform);
+    } else photos[0].photo = result;
+  });
+}
+
+function openPhotoTools(blob, apply) {
+  const activeDraft = draft;
+  if (!blob || !activeDraft) return;
+  return editPhotoImage(blob, (result, transform) => {
+    if (draft !== activeDraft) return;
+    apply(result, transform);
+    showPhoto();
+  }).catch(error => { if (draft === activeDraft) showError(error); });
 }
 
 let quotaGeneration = 0;
@@ -666,7 +762,7 @@ $("login").onclick = async () => {
   $("login-status").textContent = "正在連接 Google Drive…";
   try {
     await drive.login({ clientId, owner });
-    await refresh();
+    await refresh({ initial: true });
     setSignedIn(true);
   } catch (error) {
     signOut(error.message);

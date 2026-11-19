@@ -6,20 +6,21 @@
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>收納管家</title>
-  <link rel="icon" href="icon.svg?v=37" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest?v=37">
-  <link rel="stylesheet" href="app.css?v=37">
+  <link rel="icon" href="icon.svg?v=38" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest?v=38">
+  <link rel="stylesheet" href="app.css?v=38">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
-  <script src="drive.js?v=37" defer></script>
-  <script src="appearance.js?v=37" defer></script>
-  <script src="plan.js?v=37" defer></script>
-  <script src="export.js?v=37" defer></script>
-  <script src="app.js?v=37" defer></script>
+  <script src="drive.js?v=38" defer></script>
+  <script src="appearance.js?v=38" defer></script>
+  <script src="photo.js?v=38" defer></script>
+  <script src="plan.js?v=38" defer></script>
+  <script src="export.js?v=38" defer></script>
+  <script src="app.js?v=38" defer></script>
 </head>
 <body>
   <header class="brand">
-    <img src="icon.svg?v=37" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
+    <img src="icon.svg?v=38" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
       <p id="drive-quota" class="page-version" role="status"></p>
       <button id="retry-quota" class="quiet" hidden>重試讀取容量</button></div>
     <section id="header-storage" class="header-storage" hidden aria-label="收納與雲端容量">
@@ -39,15 +40,15 @@
     </div>
     <button id="login" class="primary">使用 Google 帳號登入</button>
     <p id="login-status" role="status"></p>
-    <img class="login-photo" src="assets/family.png?v=37" alt="家人在海邊的合照">
+    <img class="login-photo" src="assets/family.png?v=38" alt="家人在海邊的合照">
   </section>
   <main hidden>
     <section id="floor-plans" class="floor-plans" aria-labelledby="floor-heading">
       <h2 id="floor-heading" hidden>四層透天平面圖</h2>
       <div id="floor-tabs" class="floor-tabs" aria-label="選擇樓層"></div>
       <div id="marker-tools" class="marker-tools" role="region" aria-label="調整收納圖示" aria-live="polite" hidden></div>
-      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=37" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
-      <a class="plan-original" href="assets/floor-plans.png?v=37" target="_blank" rel="noopener">查看完整平面圖</a>
+      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=38" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
+      <a class="plan-original" href="assets/floor-plans.png?v=38" target="_blank" rel="noopener">查看完整平面圖</a>
     </section>
     <div class="path-toolbar">
       <nav id="path" aria-label="收納位置"></nav>
@@ -85,15 +86,37 @@
       <div id="photos" hidden>
         <img id="preview" alt="物品照片預覽" hidden>
         <div id="batch-preview" class="batch-preview"></div>
-        <div class="photo-controls">
-          <label class="photo-button">拍照<input id="camera" type="file" accept="image/*" capture="environment"></label>
-          <label class="photo-button">選擇照片<input id="gallery" type="file" accept="image/*" multiple></label>
-          <button type="button" class="quiet" id="remove-photo" hidden>移除照片</button>
-        </div>
+      </div>
+      <div class="photo-controls editor-submit">
+        <label class="photo-button">拍照<input id="camera" type="file" accept="image/*" capture="environment"></label>
+        <label class="photo-button">選擇照片<input id="gallery" type="file" accept="image/*" multiple></label>
+        <button class="primary" id="save">儲存</button>
+      </div>
+      <div class="photo-controls editor-secondary">
+        <button type="button" class="quiet" id="edit-photo" hidden>旋轉／裁切照片</button>
+        <button type="button" class="quiet" id="remove-photo" hidden>移除照片</button>
+        <button type="button" id="remove" class="danger" hidden>刪除</button>
       </div>
       <p id="form-status" role="status"></p>
-      <div class="editor-actions"><button type="button" id="remove" class="danger" hidden>刪除</button><button class="primary" id="save">儲存</button></div>
     </form>
+  </dialog>
+  <dialog id="photo-editor" aria-labelledby="photo-editor-title">
+    <h2 id="photo-editor-title">旋轉／裁切照片</h2>
+    <canvas id="photo-canvas" aria-label="裁切預覽"></canvas>
+    <div class="photo-controls">
+      <button type="button" class="quiet" id="rotate-photo">向右轉 90°</button>
+      <button type="button" class="quiet" id="reset-crop">重設</button>
+    </div>
+    <div id="crop-controls" class="crop-controls">
+      <label>裁左 <input type="range" min="0" max="45" value="0"></label>
+      <label>裁上 <input type="range" min="0" max="45" value="0"></label>
+      <label>裁右 <input type="range" min="0" max="45" value="0"></label>
+      <label>裁下 <input type="range" min="0" max="45" value="0"></label>
+    </div>
+    <div class="editor-actions">
+      <button type="button" class="quiet" id="cancel-crop">取消</button>
+      <button type="button" class="primary" id="apply-crop">套用</button>
+    </div>
   </dialog>
   <dialog id="appearance-dialog" aria-labelledby="appearance-title">
     <div class="section-title"><h2 id="appearance-title">圖示與顏色</h2><button id="appearance-close" class="quiet" aria-label="關閉">✕</button></div>

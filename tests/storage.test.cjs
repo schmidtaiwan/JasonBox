@@ -53,7 +53,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     }
   };
   vm.createContext(context);
-  for (const file of ['appearance.js', 'plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['appearance.js', 'photo.js', 'plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
   assert.ok(run('changeDescription({updatedAt: "2026-11-19T04:00:00Z",updatedBy:"backy2777@example.com"})').endsWith(' · BACKY2777'));
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
@@ -77,6 +77,11 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(get('view-list').attrs['aria-pressed'], 'true');
   await run('refresh()');
   assert.equal(get('list').className, 'compact-list', 'refresh preserves selected display mode');
+  await run('refresh({ initial: true })');
+  assert.equal(run('current.name'), '1F', 'new sessions start on the first floor');
+  assert.equal(get('floor-tabs').children[0].attrs['aria-pressed'], 'true');
+  get('floor-tabs').children[4].onclick();
+  assert.equal(run('current'), null, 'ALL remains selectable');
   get('view-details').onclick();
   assert.equal(get('list').className, '');
   assert.equal(get('view-details').attrs['aria-pressed'], 'true');
@@ -137,7 +142,8 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('current.id'), storage.id);
   get('current-space-icon').onclick();
   assert.equal(get('appearance-dialog').open, true);
-  assert.equal(get('icon-choices').children.length, 9);
+  assert.equal(get('icon-choices').children.length, 10);
+  assert.equal(get('icon-choices').children[9].children[1].textContent, '僅照片（透明底）');
   assert.equal(get('color-choices').children.length, 8);
   get('icon-choices').children[1].onclick();
   get('color-choices').children[1].onclick();
@@ -183,7 +189,8 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await get('form').onsubmit({ preventDefault() {} });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(get('editor').open, true, 'empty item is rejected');
-  run('draft.photo = new Blob(["test photo"], {type:"image/jpeg"})');
+  run('compress = async blob => blob');
+  await get('camera').onchange({ target: { files: [Object.assign(new Blob(['test photo'], { type: 'image/jpeg' }), { name: 'test.jpg' })] } });
   const realSave = context.drive.save;
   let resolveUpload, rejectUpload;
   context.drive.save = () => new Promise((resolve, reject) => { resolveUpload = resolve; rejectUpload = reject; });
@@ -202,6 +209,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await new Promise(resolve => setImmediate(resolve));
   context.drive.save = realSave;
   assert.equal(run('photoUploads.size'), 0, 'retry replaces local photo with uploaded record');
+  assert.equal(get('drive-quota').textContent, '1GB/15GB', 'successful upload refreshes quota');
   run('queueSelectedPhotos({level:4,parent:current.id,name:"批次照片",photos:[{name:"照片A",photo:new Blob(["a"])},{name:"照片B",photo:new Blob(["b"])}]}, "")');
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(records.filter(r => ["照片A", "照片B"].includes(r.name) && r.parent === storage.id).length, 2, 'multiple photos go into the same cabinet');
@@ -305,6 +313,14 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(get('drive-quota').textContent, '', 'late quota response cannot repopulate signed-out account');
   assert.equal(get('header-storage').hidden, true);
   assert.equal(get('account-menu').hidden, true);
+  run('navigate(entries.find(e => e.name === "床底下")); setSignedIn(true)');
+  get('add').onclick();
+  get('name').value = '圍巾 帽子,手套，雨傘';
+  await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  for (const name of ['圍巾', '帽子', '手套', '雨傘']) assert.ok(records.some(record => record.name === name));
+  const moved = run('photoPoint(combinePhotoTransforms([2,0,0,2,-.5,-.5],[0,1,-1,0,1,0]), .5, .25)');
+  assert.deepEqual(Array.from(moved), [1, .5], 'rotation and crop preserve relative marker location');
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {
@@ -339,7 +355,9 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
     if (parsed.searchParams.has('q')) {
       const query = parsed.searchParams.get('q');
       const parents = [...query.matchAll(/'([^']+)' in parents/g)].map(match => match[1]);
-      return Response.json({ files: [...files.values()].filter(file => !file.trashed && file.parents.some(parent => parents.includes(parent))) });
+      return Response.json({ files: [...files.values()].filter(file => !file.trashed && file.parents.some(parent => parents.includes(parent))
+        && (!query.includes('jasonBoxSpacePhoto') || file.appProperties?.jasonBoxSpacePhoto === '1')
+        && (!query.includes('jasonBoxItem') || file.mimeType === folder || file.appProperties?.jasonBoxItem === '1')) });
     }
     return Response.json(files.get(id));
   };
@@ -392,6 +410,16 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   assert.equal(placed.photoY, .5);
   const afterPhoto = await run('drive.readEntries()');
   assert.equal(afterPhoto.find(e => e.id === 'space').photoId, photoSpace.photoId);
+  context.photoSpace = photoSpace;
+  const album = await run('drive.save({...photoSpace, iconKey:"photo-only", extraPhotos:[{name:"側面",photo:new Blob(["side"])},{name:"近照",photo:new Blob(["close"])}]})');
+  assert.equal(album.spaceAlbum, true);
+  assert.equal(album.iconKey, 'photo-only');
+  assert.equal(album.photoId, photoSpace.photoId, 'adding photos preserves the cover used for location markers');
+  assert.equal((await run('drive.spacePhotos("space")')).length, 2);
+  assert.ok(!(await run('drive.readEntries()')).some(record => record.name === '側面'));
+  const rotated = await run('drive.save({...photoSpace, photo:new Blob(["rotated"]), replaceCover:true, coverTransform:[0,1,-1,0,1,0]})');
+  assert.equal(rotated.photoId, photoSpace.photoId);
+  assert.deepEqual(Array.from(rotated.coverTransform), [0, 1, -1, 0, 1, 0]);
 
   const quota = await run('drive.quota()');
   assert.equal(quota.usage, '1024');

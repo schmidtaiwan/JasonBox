@@ -43,6 +43,7 @@ class Node {
   replaceWith(node) { this.replacement = node; }
   setAttribute(key, value) { this.attrs[key] = value; }
   removeAttribute(key) { delete this.attrs[key]; }
+  remove() {}
   get childElementCount() { return this.children.length; }
   reset() {}
   showModal() { this.open = true; }
@@ -525,6 +526,23 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('floorSnapshotOnly'), false);
   assert.equal(run('current.name'), '2F', 'detail loading preserves the floor selected from the snapshot');
   assert.ok(run('entries.some(entry => entry.level === 4)'));
+  const floorId = records.find(record => record.name === '2F').id;
+  context.alignmentFixture = [
+    { id: 'align-a', level: 1, parent: floorId, name: '框選A', x: 650 / 1672, y: 200 / 941 },
+    { id: 'align-b', level: 1, parent: floorId, name: '框選B', x: 700 / 1672, y: 300 / 941 }
+  ];
+  records.push(...context.alignmentFixture);
+  run('entries.push(...alignmentFixture); navigate(null)');
+  get('floor-tabs').children[5].onclick();
+  const selectionMap = get('floor-image').children[0];
+  selectionMap.onpointerdown({ pointerId: 1, button: 0, clientX: 620, clientY: 170, preventDefault() {} });
+  selectionMap.onpointermove({ pointerId: 1, clientX: 720, clientY: 325 });
+  selectionMap.onpointerup({ pointerId: 1, clientX: 720, clientY: 325 });
+  assert.equal(run('planAlignment.size'), 2);
+  await get('alignment-tools').children.find(node => node.textContent === '靠右').onclick();
+  assert.equal(records.find(record => record.id === 'align-a').x, 700 / 1672);
+  assert.equal(records.find(record => record.id === 'align-b').x, 700 / 1672);
+  assert.equal(records.find(record => record.id === 'align-a').y, 200 / 941);
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

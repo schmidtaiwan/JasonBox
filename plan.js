@@ -14,6 +14,7 @@ function floorPlanY(y, floor, reverse = false) {
   return anchor + (y - anchor) * (reverse ? 2 / 3 : 1.5);
 }
 let planAdjustment = null;
+let planAlignment = null;
 let floorRenderRevision = 0;
 let adjustmentScroll = null;
 
@@ -93,11 +94,8 @@ function attachMarkerGesture(marker, svg, entry) {
     press.dragged = true;
     suppressClick = true;
     event.preventDefault();
-    const point = svg.createSVGPoint();
-    point.x = event.clientX; point.y = event.clientY;
-    const matrix = svg.getScreenCTM();
-    if (!matrix) return;
-    const local = point.matrixTransform(matrix.inverse());
+    const local = pointOnPlan(svg, event);
+    if (!local) return;
     const floor = floorNumber(ancestors(entry)[0]?.name || "");
     if (!floor) return;
     const [left, top, right, bottom] = planBounds[floor - 1];
@@ -160,6 +158,149 @@ function svgNode(tag, attrs = {}) {
   return node;
 }
 
+function pointOnPlan(svg, event) {
+  const matrix = svg.getScreenCTM();
+  if (!matrix) return null;
+  const point = svg.createSVGPoint();
+  point.x = event.clientX;
+  point.y = event.clientY;
+  return point.matrixTransform(matrix.inverse());
+}
+
+function markerPoint(entry, floor) {
+  return { x: entry.x * 1672, y: floorPlanY(entry.y * 941, floor) };
+}
+
+function alignmentPositions(selection, axis, edge) {
+  const result = [];
+  for (const floor of [1, 2, 3, 4]) {
+    const group = selection.filter(marker => marker.floor === floor);
+    if (group.length < 2) continue;
+    const coordinates = group.map(marker => markerPoint(marker.entry, floor)[axis]);
+    const min = Math.min(...coordinates);
+    const max = Math.max(...coordinates);
+    const value = edge === "min" ? min : edge === "max" ? max : (min + max) / 2;
+    for (const { entry, node } of group) {
+      const next = axis === "x" ? { ...entry, x: value / 1672 } : { ...entry, y: floorPlanY(value, floor, true) / 941 };
+      if (Math.abs(next[axis] - entry[axis]) > .000001) result.push({ entry: next, node, floor });
+    }
+  }
+  return result;
+}
+
+function renderAlignmentTools(markers) {
+  const host = $("alignment-tools");
+  host.hidden = !planAlignment;
+  host.replaceChildren();
+  if (!planAlignment) return;
+  const selected = markers.filter(marker => planAlignment.has(marker.entry.id) && !photoUploads.has(marker.entry.id));
+  const sameFloor = [1, 2, 3, 4].some(floor => selected.filter(marker => marker.floor === floor).length > 1);
+  const status = element("p", selected.length ? "已選取 " + selected.length + " 個圖示" : "在圖上拖曳框選，或逐一點選。", "muted");
+  status.setAttribute("role", "status");
+  host.append(status);
+  for (const [name, axis, edge] of [
+    ["靠左", "x", "min"], ["靠右", "x", "max"], ["靠上", "y", "min"], ["靠下", "y", "max"],
+    ["水平置中", "x", "center"], ["垂直置中", "y", "center"]
+  ]) {
+    const control = button(name, "secondary", async () => {
+      const changes = alignmentPositions(selected, axis, edge);
+      if (!changes.length) return;
+      const revision = floorRenderRevision;
+      const jobs = changes.map(change => {
+        const { x, y } = markerPoint(change.entry, change.floor);
+        change.node.setAttribute("transform", `translate(${x},${y}) scale(1.3)`);
+        const marker = markers.find(value => value.entry.id === change.entry.id);
+        marker.entry = change.entry;
+        return queuePhotoUpload(change.entry, { preserveMap: true });
+      });
+      $("mutation-status").textContent = "已對齊，正在背景儲存位置。";
+      renderAlignmentTools(markers);
+      await Promise.all(jobs.map(job => job.completion));
+      if (revision !== floorRenderRevision || !planAlignment) return;
+      if (jobs.every(job => !job.failed)) $("mutation-status").textContent = "已儲存對齊位置。";
+      renderAlignmentTools(markers);
+    });
+    control.disabled = !sameFloor;
+    host.append(control);
+  }
+}
+
+function attachAlignmentSelection(svg, markers) {
+  let drag;
+  let outline;
+  const select = ids => {
+    planAlignment = ids;
+    for (const marker of markers) {
+      const selected = ids.has(marker.entry.id);
+      marker.node.setAttribute("aria-pressed", String(selected));
+      if (selected) marker.node.classList.add("alignment-selected");
+      else marker.node.classList.remove("alignment-selected");
+    }
+    renderAlignmentTools(markers);
+  };
+  const toggle = marker => {
+    if (photoUploads.has(marker.entry.id)) return;
+    const ids = new Set(planAlignment);
+    if (ids.has(marker.entry.id)) ids.delete(marker.entry.id);
+    else ids.add(marker.entry.id);
+    select(ids);
+  };
+  for (const marker of markers) marker.node.onkeydown = event => {
+    if (!["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    toggle(marker);
+  };
+  const region = (a, b) => ({
+    x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y)
+  });
+  const cancel = () => {
+    outline?.remove();
+    outline = undefined;
+    drag = undefined;
+  };
+  svg.onpointerdown = event => {
+    if (drag || event.button !== 0 || event.isPrimary === false) return;
+    const start = pointOnPlan(svg, event);
+    if (!start) return;
+    event.preventDefault();
+    svg.setPointerCapture(event.pointerId);
+    drag = { id: event.pointerId, start, clientX: event.clientX, clientY: event.clientY };
+    outline = svgNode("rect", { class: "alignment-box" });
+    svg.append(outline);
+  };
+  svg.onpointermove = event => {
+    if (drag?.id !== event.pointerId) return;
+    const point = pointOnPlan(svg, event);
+    if (point) for (const [key, value] of Object.entries(region(drag.start, point))) outline.setAttribute(key, value);
+  };
+  svg.onpointerup = event => {
+    if (drag?.id !== event.pointerId) return;
+    const { start, clientX, clientY } = drag;
+    const point = pointOnPlan(svg, event);
+    cancel();
+    if (!point) return;
+    if (Math.hypot(event.clientX - clientX, event.clientY - clientY) < 5) {
+      let closest;
+      let distance = 25;
+      for (const marker of markers) {
+        const position = markerPoint(marker.entry, marker.floor);
+        const next = Math.hypot(point.x - position.x, point.y - position.y);
+        if (next < distance) { closest = marker; distance = next; }
+      }
+      if (closest) toggle(closest);
+      return;
+    }
+    const box = region(start, point);
+    select(new Set(markers.filter(marker => {
+      const { x, y } = markerPoint(marker.entry, marker.floor);
+      return !photoUploads.has(marker.entry.id) && x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height;
+    }).map(marker => marker.entry.id)));
+  };
+  svg.onpointercancel = cancel;
+  svg.onlostpointercapture = cancel;
+  select(planAlignment);
+}
+
 function renderFloorPlans(query) {
   floorRenderRevision++;
   $("floor-plans").hidden = Boolean(query) || Boolean(current && current.level > 0);
@@ -167,13 +308,15 @@ function renderFloorPlans(query) {
   const number = floor ? floorNumber(floor.name) : null;
   const host = $("floor-image");
   host.className = number ? "interactive-plan single-plan" : "interactive-plan";
+  if (planAlignment) host.classList.add("aligning");
   host.removeAttribute("role");
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds
     ? [bounds[0] - 8, number === 1 ? floorPlanTop : 20, bounds[2] - bounds[0] + 16, number === 1 ? floorPlanHeight : 910]
     : [0, floorPlanTop, 1672, floorPlanHeight];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=65", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
+  const alignmentMarkers = [];
+  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=66", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     const markerFloor = floorNumber(ancestors(entry)[0]?.name || "");
@@ -204,20 +347,36 @@ function renderFloorPlans(query) {
       if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(event); }
     };
     const keyboardOpen = marker.onkeydown;
-    attachMarkerGesture(marker, svg, entry);
-    const adjustKey = marker.onkeydown;
-    marker.onkeydown = event => { adjustKey(event); if (!planAdjustment) keyboardOpen(event); };
+    if (planAlignment) {
+      marker.onclick = null;
+      marker.setAttribute("aria-label", "選取存放空間：" + entry.name);
+      alignmentMarkers.push({ entry, node: marker, floor: markerFloor });
+    } else {
+      attachMarkerGesture(marker, svg, entry);
+      const adjustKey = marker.onkeydown;
+      marker.onkeydown = event => { adjustKey(event); if (!planAdjustment) keyboardOpen(event); };
+    }
     svg.append(marker);
   }
   host.replaceChildren(svg);
+  const align = button("⊞ 對齊", planAlignment ? "floor-tab selected" : "floor-tab", () => {
+    planAdjustment = null;
+    planAlignment = planAlignment ? null : new Set();
+    render();
+    $("floor-tabs").lastElementChild?.focus();
+  });
+  align.setAttribute("aria-pressed", String(Boolean(planAlignment)));
+  align.disabled = floorSnapshotOnly;
   $("floor-tabs").replaceChildren(...[1, 2, 3, 4].map(value => {
     const entry = entries.find(item => item.level === 0 && floorNumber(item.name) === value);
     const tab = button(value + "F", number === value ? "floor-tab selected" : "floor-tab", () => navigate(entry));
     tab.disabled = !entry;
     tab.setAttribute("aria-pressed", String(number === value));
     return tab;
-  }), button("ALL", number ? "floor-tab" : "floor-tab selected", () => navigate(null)));
+  }), button("ALL", number ? "floor-tab" : "floor-tab selected", () => navigate(null)), align);
   renderAdjustmentTools();
+  if (planAlignment) attachAlignmentSelection(svg, alignmentMarkers);
+  else renderAlignmentTools([]);
 }
 
 

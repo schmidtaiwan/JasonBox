@@ -1,8 +1,8 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 74;
-const PAGE_DATE = "2026-11-20";
+const PAGE_BUILD = 75;
+const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
 let markerSettings = { iconsOnly: false, size: "normal", position: "below", color: "#183d2a" };
@@ -433,7 +433,7 @@ async function captureSnapshotObject(event) {
   resetSnapshotCutout();
   cutoutBusy = true;
   $("snapshot-add-submit").disabled = true;
-  $("snapshot-cutout-status").textContent = "正在擷取輪廓，首次使用會先下載模型…";
+  $("snapshot-cutout-status").textContent = "正在擷取物品輪廓…";
   try {
     const result = await makeObjectCutout(image, point, image.src);
     if (!snapshotDialog.open || request !== snapshotRequest) return;

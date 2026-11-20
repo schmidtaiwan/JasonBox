@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 58;
+const PAGE_BUILD = 59;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -188,16 +188,18 @@ function queueSelectedPhotos(record, name, names = []) {
   }
 }
 
-function queuePhotoUpload(record) {
+function queuePhotoUpload(record, { preserveMap = false } = {}) {
   const id = record.id || "pending-photo-" + ++uploadSequence;
   const local = { ...record, id, hasPhoto: Boolean(record.photo || (record.hasPhoto && !record.photoRemoved)), updatedAt: new Date().toISOString(), updatedBy: drive.account()?.email,
     createdAt: record.createdAt || new Date().toISOString() };
-  const job = { id, record, local, failed: false, running: false };
+  const job = { id, record, local, failed: false, running: false, mapRevision: preserveMap ? floorRenderRevision : undefined };
   photoUploads.set(id, job);
   entries = entries.filter(entry => entry.id !== id).concat(local);
   if (current?.id === id) current = local;
-  closeEditor();
-  render();
+  if (!preserveMap) {
+    closeEditor();
+    render();
+  }
   job.completion = sendPhotoUpload(job);
 }
 
@@ -205,7 +207,7 @@ async function sendPhotoUpload(job) {
   if (job.running) return;
   job.running = true;
   job.failed = false;
-  render();
+  if (job.mapRevision !== floorRenderRevision) render();
   try {
     const parentJob = photoUploads.get(job.record.parent);
     if (parentJob) {
@@ -241,7 +243,7 @@ async function sendPhotoUpload(job) {
     $("mutation-status").textContent = "背景儲存失敗：" + error.message + "。點選失敗項目可重試。";
   } finally {
     job.running = false;
-    render();
+    if (job.failed || job.mapRevision !== floorRenderRevision) render();
   }
 }
 

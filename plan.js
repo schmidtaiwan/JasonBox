@@ -6,6 +6,7 @@ const planBounds = [
   [860, 118, 1182, 822], [1238, 118, 1564, 822]
 ];
 let planAdjustment = null;
+let floorRenderRevision = 0;
 let adjustmentScroll = null;
 
 function lockAdjustmentScroll(locked) {
@@ -61,6 +62,7 @@ function attachMarkerGesture(marker, svg, entry) {
   const clear = () => { clearTimeout(timer); timer = undefined; };
   marker.onpointerdown = event => {
     if (event.button !== undefined && event.button !== 0) return;
+    entry = entries.find(record => record.id === entry.id) || entry;
     event.stopPropagation();
     suppressClick = false;
     press = { id: event.pointerId, x: event.clientX, y: event.clientY, dragged: false };
@@ -104,7 +106,11 @@ function attachMarkerGesture(marker, svg, entry) {
     if (planAdjustment?.id !== entry.id) return;
     const record = planAdjustment;
     planAdjustment = null;
-    if (dragged && (record.x !== entry.x || record.y !== entry.y)) queuePhotoUpload(record);
+    if (dragged && (record.x !== entry.x || record.y !== entry.y)) {
+      marker.classList.remove("adjusting");
+      renderAdjustmentTools();
+      queuePhotoUpload(record, { preserveMap: true });
+    }
     else render();
   };
   const cancelPress = event => {
@@ -122,7 +128,7 @@ function attachMarkerGesture(marker, svg, entry) {
   marker.onclick = event => {
     event.stopPropagation();
     if (suppressClick || planAdjustment) return;
-    navigate(entry);
+    navigate(entries.find(record => record.id === entry.id) || entry);
   };
   marker.onkeydown = event => {
     if (event.key === "F2") {
@@ -147,6 +153,7 @@ function svgNode(tag, attrs = {}) {
 }
 
 function renderFloorPlans(query) {
+  floorRenderRevision++;
   $("floor-plans").hidden = Boolean(query) || Boolean(current && current.level > 0);
   const floor = ancestors(current).find(entry => entry.level === 0);
   const number = floor ? floorNumber(floor.name) : null;
@@ -156,7 +163,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=58", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=59", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
@@ -180,7 +187,7 @@ function renderFloorPlans(query) {
       text.style.fill = markerSettings.color;
       marker.append(text);
     }
-    const open = event => { event.stopPropagation(); navigate(entry); };
+    const open = event => { event.stopPropagation(); navigate(entries.find(record => record.id === entry.id) || entry); };
     marker.onclick = open;
     marker.onkeydown = event => {
       if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(event); }

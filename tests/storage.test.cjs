@@ -120,8 +120,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(get('floor-image').children[0].onclick, undefined, 'blank floor does not create spaces');
   run('navigate(entries.find(e => e.name === "2F"))');
   get('add').onclick();
-  get('add-kind').value = 'space';
-  get('add-kind').onchange();
+  get('add-kind').children[1].onclick();
   assert.equal(run('draft.parent'), records[1].id);
   assert.equal(run('draft.level'), 1);
   assert.ok(Number.isFinite(run('draft.x')));
@@ -268,8 +267,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('formatTime("2026-11-19T04:00:00Z")').includes('12:00:00'), true);
   run('navigate(entries.find(e => e.name === "床底下"))');
   get('add').onclick();
-  get('add-kind').value = 'position';
-  get('add-kind').onchange();
+  get('add-kind').children[1].onclick();
   assert.equal(run('draft.level'), 2);
   get('position-type').value = '層';
   get('name').value = '上層';
@@ -309,8 +307,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.ok(croppedLinks.children.some(node => node.textContent === '上層'));
   run('current = {...current, coverTransform:undefined}; render()');
   get('add').onclick();
-  get('add-kind').value = 'position';
-  get('add-kind').onchange();
+  get('add-kind').children[1].onclick();
   assert.equal(run('draft.parent'), storage.id);
   assert.equal(run('draft.photoX'), .5);
   assert.equal(run('draft.photoY'), .5);
@@ -337,8 +334,10 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   get('add').onclick();
   assert.equal(run('draft.parent'), run('current.id'));
   assert.equal(run('draft.level'), 1, 'floor Add defaults to space');
-  assert.equal(get('add-kind').children.length, 1, 'floors cannot select items');
-  assert.equal(get('add-kind').children[0].textContent, '空間');
+  assert.equal(get('add-kind').children.length, 3);
+  assert.equal(get('add-kind').children[0].disabled, true, 'floors cannot select items');
+  assert.equal(get('add-kind').children[2].disabled, true);
+  assert.equal(get('add-kind').children[1].textContent, '空間');
   run('closeEditor()');
   run('navigate(entries.find(e => e.name === "上層"))');
 
@@ -468,6 +467,21 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(get('snapshot-count').textContent, '2 / 2');
   get('snapshot-previous').onclick();
   assert.equal(get('snapshot-title').textContent, '第一張');
+  get('snapshot-close').onclick();
+  get('add').onclick();
+  const kinds = get('add-kind').children;
+  assert.deepEqual(kinds.map(kind => kind.textContent), ['物品', '空間', '照片']);
+  kinds[2].onclick();
+  assert.equal(get('name-field').hidden, true);
+  assert.equal(get('gallery').multiple, true);
+  await get('form').onsubmit({ preventDefault() {} });
+  assert.match(get('form-status').textContent, /請先拍照或選擇照片/);
+  await get('gallery').onchange({ target: { files: ['first.jpg', 'second.jpg'].map(name => Object.assign(new Blob([name]), { name })) } });
+  await get('form').onsubmit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  const uploadedPhotos = records.filter(record => record.parent === 'left' && record.photo);
+  assert.equal(uploadedPhotos.length, 2);
+  assert.ok(uploadedPhotos.every(record => /^物品照片 /.test(record.name)));
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

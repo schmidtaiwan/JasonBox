@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 53;
+const PAGE_BUILD = 54;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -630,15 +630,19 @@ function edit(entry, placement) {
   draft = entry ? { ...entry } : placement ? { ...placement } : { level: 4, parent: current.id };
   const isPosition = draft.level > 1 && draft.level < 4;
   $("position-type-field").hidden = true;
-  const label = draft.level === 4 ? "物品" : isPosition ? "空間（區格層）" : "存放空間";
+  const label = draft.addKind === "photo" ? "照片" : draft.level === 4 ? "物品" : isPosition ? "空間（區格層）" : "存放空間";
   $("form").reset();
   $("add-kind-field").hidden = Boolean(draft.id);
-  $("add-kind").replaceChildren(...availableAddKinds().map(([value, text]) => {
-    const option = element("option", text);
-    option.value = value;
-    return option;
+  const spaceKind = current?.level === 0 ? "space" : "position";
+  const activeKind = draft.addKind || (draft.level === 4 ? "item" : spaceKind);
+  $("add-kind").replaceChildren(...[["item", "物品"], [spaceKind, "空間"], ["photo", "照片"]].map(([kind, text]) => {
+    const choice = button(text, "", () => {
+      if (kind !== activeKind) newEntryAtCurrent(kind, { name: $("name").value, photos: draft.photos });
+    });
+    choice.disabled = !availableAddKinds().some(([value]) => value === kind);
+    choice.setAttribute("aria-pressed", String(activeKind === kind));
+    return choice;
   }));
-  $("add-kind").value = draft.level === 4 ? "item" : draft.level === 1 ? "space" : "position";
   $("gallery").multiple = draft.level < 4 || !draft.id;
   editorCover = undefined;
   savedAlbum = [];
@@ -648,6 +652,7 @@ function edit(entry, placement) {
   $("location").textContent = "存放位置：所有空間 / " + ancestors(entries.find(parent => parent.id === draft.parent))
     .map(parent => parent.name).join(" / ");
   $("name").value = draft.name ?? "";
+  $("name-field").hidden = draft.addKind === "photo";
   $("name").required = draft.level !== 4;
   $("name").maxLength = draft.id ? 80 : 1000;
   $("name").placeholder = draft.level === 4
@@ -769,13 +774,13 @@ $("search").onkeydown = event => {
 function availableAddKinds() {
   if (!current) return [];
   return current.level === 0 ? [["space", "空間"]]
-    : current.level < 3 ? [["item", "物品"], ["position", "空間（區格層）"]]
-    : [["item", "物品"]];
+    : current.level < 3 ? [["item", "物品"], ["position", "空間"], ["photo", "照片"]]
+    : [["item", "物品"], ["photo", "照片"]];
 }
-function newEntryAtCurrent(kind) {
+function newEntryAtCurrent(kind, prior = {}) {
   if (!current) return;
   if (!availableAddKinds().some(([value]) => value === kind)) kind = availableAddKinds()[0][0];
-  const record = { level: 4, parent: current.id };
+  const record = { ...prior, level: 4, parent: current.id, addKind: kind };
   if (kind === "space" && current.level === 0) {
     const floor = floorNumber(current.name);
     const [left, top, right, bottom] = planBounds[(floor || 1) - 1];
@@ -786,12 +791,6 @@ function newEntryAtCurrent(kind) {
   edit(null, record);
 }
 $("add").onclick = () => newEntryAtCurrent("item");
-$("add-kind").onchange = () => {
-  const name = $("name").value;
-  const kind = $("add-kind").value;
-  newEntryAtCurrent(kind);
-  $("name").value = name;
-};
 $("back").onclick = () => {
   if (adjustingSave) return;
   const previous = navigationHistory.length ? navigationHistory.pop() : { id: current?.parent, x: 0, y: 0, query: "" };
@@ -831,11 +830,16 @@ function batchSpacePosition(record, parent, index, total) {
 $("form").onsubmit = async event => {
   event.preventDefault();
   if ($("save").disabled || !draft || draft.level === 0) return;
-  let name = $("name").value.trim();
+  const photoOnly = draft.addKind === "photo";
+  const photos = draft.photos || [];
+  if (photoOnly && !photos.length) {
+    $("form-status").textContent = "請先拍照或選擇照片。";
+    return;
+  }
+  let name = photoOnly ? "" : $("name").value.trim();
   const enteredName = name;
   const names = draft.id ? [] : name.split(draft.level === 4 ? /[\s,，、]+/u : /\s+/u).filter(Boolean);
   if (!draft.id) name = names[0] || "";
-  const photos = draft.photos || [];
   if (!name && draft.level === 4 && (photos.length || draft.editedCover || (draft.hasPhoto && !draft.photoRemoved))) name = "物品照片 " + formatTime(new Date().toISOString());
   if (!name) {
     $("form-status").textContent = "請輸入名稱。";
@@ -844,6 +848,7 @@ $("form").onsubmit = async event => {
   }
   const record = { ...draft, name };
   delete record.editedCover;
+  delete record.addKind;
   const parent = entries.find(entry => entry.id === record.parent);
   if (!record.id && record.level === 4 && parent?.level === 0) {
     $("form-status").textContent = "樓層只能新增空間，請先進入空間再加入物品。";
@@ -858,7 +863,7 @@ $("form").onsubmit = async event => {
   if (record.level === 4 && photos.length) {
     record.photo = photos[0].photo;
     record.compressPhoto = true;
-    queueSelectedPhotos(record, enteredName, names.length > 1 ? names : []);
+    queueSelectedPhotos(record, photoOnly ? name : enteredName, names.length > 1 ? names : []);
     return;
   }
   delete record.photos;

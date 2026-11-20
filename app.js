@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 55;
+const PAGE_BUILD = 56;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -337,6 +337,7 @@ async function showSnapshot() {
   const record = snapshotRecords[snapshotIndex];
   clearSnapshotImage();
   $("snapshot-title").textContent = record.name;
+  $("snapshot-location").textContent = record.location ? "存放位置：" + record.location : "";
   $("snapshot-count").textContent = (snapshotIndex + 1) + " / " + snapshotRecords.length;
   $("snapshot-previous").disabled = snapshotIndex === 0;
   $("snapshot-next").disabled = snapshotIndex === snapshotRecords.length - 1;
@@ -435,7 +436,7 @@ async function renderSnapshots(query, generation) {
         const files = await drive.spacePhotos(space.id);
         if (generation !== snapshotGeneration) return;
         const photos = files.map(file => ({
-          id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true
+          id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true, location: space.location
         }));
         records.push(...photos);
         grid.append(...photos.map(photo => snapshotTile(photo, () => navigate(space), groups)));

@@ -466,6 +466,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const tiles = get('list').children[0].children[1].children;
   tiles.find(tile => tile.children[1].textContent === '第一張').onclick();
   assert.equal(get('snapshot-title').textContent, '第一張');
+  assert.match(get('snapshot-location').textContent, /^存放位置：.*\/ 床底下 \/ 左$/);
   const stage = get('snapshot-stage');
   stage.onpointerdown({ pointerId: 1, button: 0, clientX: 150, clientY: 10 });
   stage.onpointerup({ pointerId: 1, clientX: 50, clientY: 15 });

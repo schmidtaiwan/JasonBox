@@ -186,6 +186,7 @@ footer { z-index: 20; }
 .snapshot-tile { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #fffefa; padding: 5px; text-align: left; font-size: .85rem; overflow-wrap: anywhere; }
 .snapshot-tile .thumb { width: 100%; height: auto; aspect-ratio: 1; flex: none; object-fit: cover; }
 #snapshot-dialog { max-width: min(680px, 100% - 28px); }
+#snapshot-location { margin-top: 4px; }
 #snapshot-stage { min-height: 100px; touch-action: pan-y pinch-zoom; user-select: none; }
 #snapshot-image { display: block; width: 100%; max-height: 65dvh; object-fit: contain; }
 .snapshot-navigation { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }

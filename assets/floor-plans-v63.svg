@@ -12,17 +12,31 @@
     <rect x="334" y="389" width="13" height="57"/><rect x="346" y="475" width="36" height="45"/>
     <rect x="713" y="546" width="13" height="57"/><rect x="725" y="591" width="34" height="41"/><rect x="730" y="558" width="55" height="31"/>
     <rect x="1091" y="369" width="51" height="49"/><rect x="1091" y="409" width="13" height="63"/><rect x="1110" y="417" width="55" height="34"/>
+    <rect x="652" y="145" width="51" height="49"/>
+    <rect x="1010" y="305" width="50" height="53"/>
+    <rect x="1028" y="518" width="46" height="53"/>
+    <rect x="1469" y="355" width="51" height="57"/>
   </g>
   <g fill="#080808">
     <rect x="344" y="512" width="62" height="8"/>
     <rect x="722" y="626" width="67" height="8"/>
-    <rect x="1092" y="369" width="9" height="40"/>
+    <rect x="334" y="389" width="10" height="8"/><rect x="334" y="437" width="10" height="10"/>
+    <rect x="713" y="546" width="10" height="8"/><rect x="713" y="594" width="10" height="10"/>
+    <rect x="1092" y="369" width="9" height="51"/><rect x="1092" y="460" width="9" height="13"/>
+    <rect x="652" y="145" width="9" height="6"/><rect x="652" y="191" width="9" height="4"/>
+    <rect x="1010" y="350" width="4" height="8"/><rect x="1054" y="350" width="7" height="8"/>
+    <rect x="1028" y="519" width="2" height="9"/><rect x="1070" y="519" width="5" height="9"/>
+    <rect x="1469" y="404" width="9" height="8"/><rect x="1518" y="404" width="5" height="8"/>
   </g>
   <svg x="732" y="594" width="53" height="29" viewBox="732 560 53 29" preserveAspectRatio="none"><use href="#source"/></svg>
   <svg x="1110" y="477" width="55" height="34" viewBox="1110 417 55 34" preserveAspectRatio="none"><use href="#source"/></svg>
   <g fill="none" stroke="#161616" stroke-width="2" stroke-linecap="square">
-    <path d="M339 444H391 A52 52 0 0 0 339 392 M339 389V392 M339 444V447"/>
-    <path d="M719 550H771 A52 52 0 0 1 719 602 M719 546V550 M719 602V604"/>
-    <path d="M1097 412H1154 A57 57 0 0 1 1097 469 M1097 409V412 M1097 469V473"/>
+    <path d="M339 437H379 A40 40 0 0 0 339 397"/>
+    <path d="M719 554H759 A40 40 0 0 1 719 594"/>
+    <path d="M1097 420H1137 A40 40 0 0 1 1097 460"/>
+    <path d="M657 151H697 A40 40 0 0 1 657 191"/>
+    <path d="M1014 354V314 A40 40 0 0 1 1054 354"/>
+    <path d="M1070 523V563 A40 40 0 0 1 1030 523"/>
+    <path d="M1518 407V367 A40 40 0 0 0 1478 407"/>
   </g>
 </svg>

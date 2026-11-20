@@ -178,6 +178,13 @@ footer { z-index: 20; }
 .space-photo-frame-controls .space-photo-resize { flex: 1; }
 .space-photo-frame-controls .quiet { flex-shrink: 0; }
 .cropped-position-links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.snapshot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(27%, 110px), 1fr)); gap: 8px; }
+.snapshot-group { min-width: 0; margin-bottom: 16px; }
+.snapshot-group h3 { font-size: .95rem; margin: 0 0 8px; overflow-wrap: anywhere; }
+.snapshot-tile { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #fffefa; padding: 5px; text-align: left; font-size: .85rem; overflow-wrap: anywhere; }
+.snapshot-tile .thumb { width: 100%; height: auto; aspect-ratio: 1; flex: none; object-fit: cover; }
+#snapshot-dialog { max-width: min(680px, 100% - 28px); }
+#snapshot-image { display: block; width: 100%; max-height: 70dvh; object-fit: contain; }
 .space-photo-canvas { position: relative; width: 100%; margin-inline: auto; }
 .space-photo { display: block; width: 100%; height: auto; }
 .space-photo-marker { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; padding: 4px; max-width: 130px; border: 0; background: transparent; font-size: .85rem; font-weight: 700; text-shadow: 0 0 3px white, 0 0 6px white; touch-action: none; }

@@ -451,6 +451,12 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(records.filter(record => record.parent === 'right').length, 0);
   assert.ok(records.some(record => record.id === 'stay'));
   assert.ok(records.some(record => record.id === 'right'), 'batch delete removes items only');
+  run('navigate(entries.find(entry => entry.id === "left"))');
+  get('view-preview').onclick();
+  assert.equal(get('view-preview').attrs['aria-pressed'], 'true');
+  const itemGrid = get('list').children[0].children[1];
+  assert.ok(itemGrid.children.some(tile => tile.children[1].textContent === 'stay'));
+  assert.ok(!itemGrid.children.some(tile => tile.children[1].textContent === '層內物品'));
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

@@ -1,8 +1,8 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 51;
-const PAGE_DATE = "2026-11-19";
+const PAGE_BUILD = 52;
+const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
 let markerSettings = { iconsOnly: false, transparent: false, size: "normal", position: "below", color: "#183d2a" };
@@ -16,13 +16,17 @@ const $ = id => document.getElementById(id);
 const editor = $("editor");
 const updateDialog = $("update-dialog");
 let displayMode = "details";
-try { if (localStorage.getItem("jasonbox-display-mode") === "list") displayMode = "list"; } catch {}
+try {
+  const savedMode = localStorage.getItem("jasonbox-display-mode");
+  if (["list", "preview"].includes(savedMode)) displayMode = savedMode;
+} catch {}
 function setDisplayMode(mode) {
   displayMode = mode;
   try { localStorage.setItem("jasonbox-display-mode", mode); } catch {}
   render();
 }
 $("view-list").onclick = () => setDisplayMode("list");
+$("view-preview").onclick = () => setDisplayMode("preview");
 $("view-details").onclick = () => setDisplayMode("details");
 let entries = [];
 let current = null;
@@ -65,21 +69,33 @@ async function checkForUpdate() {
   }
 }
 
+const thumbnailCache = new Map();
+function loadSnapshotPhoto(id, updatedAt) {
+  const key = id + ":" + (updatedAt || "");
+  if (!thumbnailCache.has(key)) {
+    const pending = drive.photo(id);
+    thumbnailCache.set(key, pending);
+    pending.catch(() => { if (thumbnailCache.get(key) === pending) thumbnailCache.delete(key); });
+    if (thumbnailCache.size > 36) thumbnailCache.delete(thumbnailCache.keys().next().value);
+  }
+  return thumbnailCache.get(key);
+}
+
 const thumbnails = new IntersectionObserver(changes => {
   for (const change of changes) {
     if (!change.isIntersecting) continue;
     const placeholder = change.target;
     thumbnails.unobserve(placeholder);
-    drive.photo(placeholder.dataset.id).then(blob => {
+    loadSnapshotPhoto(placeholder.dataset.id, placeholder.dataset.updatedAt).then(blob => {
       if (!placeholder.isConnected) return;
       const img = element("img", "", "thumb");
       img.alt = "";
       img.src = URL.createObjectURL(blob);
       placeholder.replaceWith(img);
       objectUrls.push(img.src);
-    }).catch(() => {});
+    }).catch(() => { if (placeholder.isConnected) placeholder.textContent = "照片載入失敗"; });
   }
-});
+}, { rootMargin: "150px" });
 
 async function refresh({ initial = false } = {}) {
   entries = (await drive.readEntries()).filter(entry => !photoUploads.has(entry.id));
@@ -158,6 +174,7 @@ function displayThumbnail(placeholder, entry) {
     placeholder.replaceWith(img);
   } else if (entry.hasPhoto) {
     placeholder.dataset.id = entry.photoId || entry.id;
+    placeholder.dataset.updatedAt = entry.updatedAt || "";
     thumbnails.observe(placeholder);
   }
 }
@@ -294,10 +311,89 @@ function card(entry, searching) {
   return row;
 }
 
+let snapshotGeneration = 0;
+let snapshotRequest = 0;
+let snapshotUrl;
+const snapshotDialog = $("snapshot-dialog");
+$("snapshot-close").onclick = () => snapshotDialog.close();
+snapshotDialog.onclose = () => {
+  snapshotRequest++;
+  if (snapshotUrl) URL.revokeObjectURL(snapshotUrl);
+  snapshotUrl = undefined;
+  $("snapshot-image").removeAttribute("src");
+};
+
+async function openSnapshot(record) {
+  $("snapshot-title").textContent = record.name;
+  $("snapshot-status").textContent = "載入照片…";
+  $("snapshot-image").hidden = true;
+  snapshotDialog.showModal();
+  const request = ++snapshotRequest;
+  try {
+    const blob = record.photo || await loadSnapshotPhoto(record.photoId || record.id, record.updatedAt);
+    if (!snapshotDialog.open || request !== snapshotRequest) return;
+    snapshotUrl = URL.createObjectURL(blob);
+    $("snapshot-image").src = snapshotUrl;
+    $("snapshot-image").alt = record.name;
+    $("snapshot-image").hidden = false;
+    $("snapshot-status").textContent = "";
+  } catch {
+    if (snapshotDialog.open && request === snapshotRequest) $("snapshot-status").textContent = "無法載入照片，請關閉後重試。";
+  }
+}
+
+function snapshotTile(record, fallback) {
+  const hasPhoto = record.hasPhoto || record.photo;
+  const tile = button("", "snapshot-tile", () => hasPhoto ? openSnapshot(record) : fallback());
+  const thumbnail = element("span", hasPhoto ? "載入照片…" : "無照片", "thumb");
+  tile.append(thumbnail, element("span", record.name));
+  if (hasPhoto) displayThumbnail(thumbnail, record);
+  return tile;
+}
+
+function snapshotGroup(title) {
+  const section = element("section", "", "snapshot-group");
+  const grid = element("div", "", "snapshot-grid");
+  section.append(element("h3", title), grid);
+  $("list").append(section);
+  return grid;
+}
+
+async function renderSnapshots(query, generation) {
+  $("list").replaceChildren();
+  $("list-title").textContent = "照片與物品預覽";
+  const items = exportItems().filter(item => !query || item.name.toLocaleLowerCase().includes(query));
+  const spaces = exportSpaces().filter(space => !query || space.name.toLocaleLowerCase().includes(query));
+  $("count").textContent = items.length + " 件物品";
+  if (items.length) snapshotGroup("物品").append(...items.map(item => snapshotTile(item, () => openItem(item))));
+  if (!items.length && !spaces.length) $("list").append(element("p", "沒有符合的照片或物品。", "empty"));
+  const albums = [];
+  for (const space of spaces) {
+    const grid = snapshotGroup(space.location + "｜空間照片");
+    if (space.hasPhoto) grid.append(snapshotTile({ ...space, name: space.name + "・封面" }, () => navigate(space)));
+    if (space.spaceAlbum) albums.push({ space, grid });
+  }
+  for (let offset = 0; offset < albums.length && generation === snapshotGeneration; offset += 4) {
+    await Promise.all(albums.slice(offset, offset + 4).map(async ({ space, grid }) => {
+      try {
+        const files = await drive.spacePhotos(space.id);
+        if (generation !== snapshotGeneration) return;
+        grid.append(...files.map(file => snapshotTile({
+          id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true
+        }, () => navigate(space))));
+      } catch {
+        if (generation === snapshotGeneration) grid.append(element("p", "無法載入空間相簿。", "muted"));
+      }
+    }));
+  }
+}
+
 function render() {
+  const generation = ++snapshotGeneration;
   $("list").className = displayMode === "list" ? "compact-list" : "";
   $("view-list").setAttribute("aria-pressed", String(displayMode === "list"));
   $("view-details").setAttribute("aria-pressed", String(displayMode === "details"));
+  $("view-preview").setAttribute("aria-pressed", String(displayMode === "preview"));
   thumbnails.disconnect();
   objectUrls.forEach(url => URL.revokeObjectURL(url));
   objectUrls = [];
@@ -338,6 +434,10 @@ function render() {
   $("delete-items").hidden = !signedIn || Boolean(query) || !movableItems(current).length;
   $("move-items").hidden = $("delete-items").hidden || !moveTargets(current).length;
   $("edit-space").onclick = () => edit(current);
+  if (displayMode === "preview") {
+    void renderSnapshots(query, generation);
+    return;
+  }
   $("list").replaceChildren(...visible.map(entry => card(entry, Boolean(query))));
   if (!visible.length) {
     const message = query ? "找不到符合的空間或物品。" : !current || current.level === 0
@@ -915,6 +1015,8 @@ $("account-avatar").onerror = () => {
 
 function signOut(message = "") {
   if (editor.open) closeEditor();
+  if (snapshotDialog.open) snapshotDialog.close();
+  thumbnailCache.clear();
   drive.logout();
   entries = [];
   navigate(null, false);

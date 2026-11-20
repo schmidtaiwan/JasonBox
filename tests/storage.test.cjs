@@ -91,6 +91,11 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
   assert.equal(run('markerTone([0,0,0,255])'), 'light', 'dark photo uses light markers');
   assert.equal(run('markerTone([0,0,0,0])'), 'dark', 'transparent photo is treated as white');
+  assert.equal(run('floorPlanY(42, 1)'), 1, 'rear balcony grows 50% outwards');
+  assert.equal(run('floorPlanY(874, 1)'), 945, 'garage grows 50% outwards');
+  assert.equal(run('floorPlanY(945, 1, true)'), 874, 'dragging saves in the original coordinate system');
+  assert.equal(run('floorPlanY(600, 1)'), 600, 'interior coordinates stay aligned');
+  assert.equal(run('floorPlanY(874, 2)'), 874, 'other levels preserve their coordinates');
   await run('refresh()'); await run('refresh()');
   assert.equal(records.length, 4, 'no duplicate floors on reload');
   assert.equal(get('add').hidden, false);

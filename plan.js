@@ -5,6 +5,14 @@ const planBounds = [
   [112, 42, 418, 873], [482, 118, 802, 822],
   [860, 118, 1182, 822], [1238, 118, 1564, 822]
 ];
+const floorPlanTop = -12;
+const floorPlanHeight = 1028;
+
+function floorPlanY(y, floor, reverse = false) {
+  if (floor !== 1) return y;
+  const anchor = y < 124 ? 124 : y > 732 ? 732 : y;
+  return anchor + (y - anchor) * (reverse ? 2 / 3 : 1.5);
+}
 let planAdjustment = null;
 let floorRenderRevision = 0;
 let adjustmentScroll = null;
@@ -94,8 +102,8 @@ function attachMarkerGesture(marker, svg, entry) {
     if (!floor) return;
     const [left, top, right, bottom] = planBounds[floor - 1];
     planAdjustment.x = Math.min(right - 12, Math.max(left + 12, local.x)) / 1672;
-    planAdjustment.y = Math.min(bottom - 12, Math.max(top + 12, local.y)) / 941;
-    marker.setAttribute("transform", `translate(${planAdjustment.x * 1672},${planAdjustment.y * 941}) scale(1.3)`);
+    planAdjustment.y = Math.min(bottom - 12, Math.max(top + 12, floorPlanY(local.y, floor, true))) / 941;
+    marker.setAttribute("transform", `translate(${planAdjustment.x * 1672},${floorPlanY(planAdjustment.y * 941, floor)}) scale(1.3)`);
   };
   marker.onpointerup = event => {
     if (press?.id !== event.pointerId) return;
@@ -161,14 +169,17 @@ function renderFloorPlans(query) {
   host.className = number ? "interactive-plan single-plan" : "interactive-plan";
   host.removeAttribute("role");
   const bounds = number ? planBounds[number - 1] : null;
-  const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
+  const view = bounds
+    ? [bounds[0] - 8, number === 1 ? floorPlanTop : 20, bounds[2] - bounds[0] + 16, number === 1 ? floorPlanHeight : 910]
+    : [0, floorPlanTop, 1672, floorPlanHeight];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=62", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=63", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
-    if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
+    const markerFloor = floorNumber(ancestors(entry)[0]?.name || "");
+    if (number && markerFloor !== number) continue;
     const marker = svgNode("g", {
-      transform: `translate(${entry.x * 1672},${entry.y * 941}) scale(1.3)`,
+      transform: `translate(${entry.x * 1672},${floorPlanY(entry.y * 941, markerFloor)}) scale(1.3)`,
       role: "button", tabindex: "0", "aria-label": "開啟存放空間：" + entry.name,
       class: "storage-marker" + (entry.id === current?.id ? " active" : "") + (entry.id === planAdjustment?.id ? " adjusting" : "")
     });

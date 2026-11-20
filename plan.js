@@ -39,13 +39,10 @@ document.addEventListener("keydown", event => {
       && event.target === document.body) event.preventDefault();
 });
 
-function markerScale(entry) {
-  return Math.min(2.5, Math.max(.5, Number(entry.scale) || 1));
-}
 
 function startAdjustment(entry) {
   if (adjustingSave) return;
-  planAdjustment = { ...entry, scale: markerScale(entry) };
+  planAdjustment = { ...entry, scale: 1 };
   renderAdjustmentTools();
 }
 
@@ -54,18 +51,11 @@ function renderAdjustmentTools() {
   const host = $("marker-tools");
   host.hidden = !planAdjustment;
   if (!planAdjustment) { host.replaceChildren(); return; }
-  const label = element("p", "調整「" + planAdjustment.name + "」：拖曳圖示移動，使用按鈕調整大小。");
-  const resize = amount => {
-    planAdjustment.scale = Math.round(Math.min(2.5, Math.max(.5, planAdjustment.scale + amount)) * 10) / 10;
-    renderFloorPlans("");
-  };
-  const smaller = button("縮小", "quiet", () => resize(-.1));
-  const larger = button("放大", "quiet", () => resize(.1));
-  const size = element("span", Math.round(planAdjustment.scale * 100) + "%", "marker-size");
+  const label = element("p", "拖曳「" + planAdjustment.name + "」調整位置。");
   const save = button(adjustingSave ? "儲存中…" : "儲存調整", "primary", saveAdjustment);
   const cancel = button("取消", "quiet", () => { planAdjustment = null; render(); });
-  for (const control of [smaller, larger, save, cancel]) control.disabled = adjustingSave;
-  host.replaceChildren(label, smaller, size, larger, save, cancel);
+  for (const control of [save, cancel]) control.disabled = adjustingSave;
+  host.replaceChildren(label, save, cancel);
 }
 
 async function saveAdjustment() {
@@ -92,7 +82,7 @@ async function saveAdjustment() {
   }
 }
 
-function attachMarkerGesture(marker, svg, entry, number) {
+function attachMarkerGesture(marker, svg, entry) {
   let timer, press, suppressClick = false;
   const clear = () => { clearTimeout(timer); timer = undefined; };
   marker.onpointerdown = event => {
@@ -129,7 +119,7 @@ function attachMarkerGesture(marker, svg, entry, number) {
     const [left, top, right, bottom] = planBounds[floor - 1];
     planAdjustment.x = Math.min(right - 12, Math.max(left + 12, local.x)) / 1672;
     planAdjustment.y = Math.min(bottom - 12, Math.max(top + 12, local.y)) / 941;
-    marker.setAttribute("transform", `translate(${planAdjustment.x * 1672},${planAdjustment.y * 941}) scale(${(number ? 1.3 : 3) * markerScale(planAdjustment)})`);
+    marker.setAttribute("transform", `translate(${planAdjustment.x * 1672},${planAdjustment.y * 941}) scale(1.3)`);
   };
   marker.onpointerup = event => {
     if (press?.id !== event.pointerId) return;
@@ -176,24 +166,22 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=56", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=57", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;
     const marker = svgNode("g", {
-      transform: `translate(${entry.x * 1672},${entry.y * 941}) scale(${(number ? 1.3 : 3) * markerScale(entry)})`,
+      transform: `translate(${entry.x * 1672},${entry.y * 941}) scale(1.3)`,
       role: "button", tabindex: "0", "aria-label": "開啟存放空間：" + entry.name,
       class: "storage-marker" + (entry.id === current?.id ? " active" : "") + (entry.id === planAdjustment?.id ? " adjusting" : "")
     });
-    const iconEntry = markerIconEntry(entry);
-    const appearance = spaceAppearance(iconEntry);
+    const { photoOnly, color } = spaceAppearance(entry);
     const circle = svgNode("circle", { r: 19 });
-    const photoOnly = appearance.icon[0] === "photo-only";
-    circle.style.fill = photoOnly ? "transparent" : appearance.color;
+    circle.style.fill = photoOnly ? "transparent" : color;
     if (photoOnly) circle.style.stroke = "none";
     marker.append(circle);
-    if (!photoOnly) marker.append(svgNode("path", { d: appearance.icon[2] }));
-    if (photoOnly || appearance.icon[0] === "photo") addPhotoThumbnail(marker, iconEntry, photoOnly ? 38 : 28, photoOnly);
+    if (photoOnly) addPhotoThumbnail(marker, entry, 38, color);
+    else marker.append(svgNode("path", { d: defaultSpaceIcon }));
     if (!markerSettings.iconsOnly) {
       const size = 17 * markerSizes[markerSettings.size];
       const text = svgNode("text", { y: markerSettings.position === "above" ? -25 : 24 + size * .76, "text-anchor": "middle" });
@@ -208,7 +196,7 @@ function renderFloorPlans(query) {
       if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(event); }
     };
     const keyboardOpen = marker.onkeydown;
-    attachMarkerGesture(marker, svg, entry, number);
+    attachMarkerGesture(marker, svg, entry);
     const adjustKey = marker.onkeydown;
     marker.onkeydown = event => { adjustKey(event); if (!planAdjustment) keyboardOpen(event); };
     svg.append(marker);
@@ -224,9 +212,6 @@ function renderFloorPlans(query) {
   renderAdjustmentTools();
 }
 
-function markerIconEntry(entry) {
-  return markerSettings.transparent && (entry.hasPhoto || entry.photo) ? { ...entry, iconKey: "photo-only" } : entry;
-}
 
 
 // A space photo uses its own normalized coordinates, independent of floor markers.
@@ -414,9 +399,7 @@ function renderSpaceLayout(query) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
     const iconHost = element("span", "", "space-photo-icon");
-    const iconEntry = markerIconEntry(position);
-    if (spaceAppearance(iconEntry).icon[0] === "photo-only") iconHost.classList.add("photo-only");
-    iconHost.append(spaceIconNode(iconEntry));
+    iconHost.append(spaceIconNode(position));
     marker.append(iconHost);
     if (!markerSettings.iconsOnly) {
       const label = element("span", position.name, "space-photo-label");

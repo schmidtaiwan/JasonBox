@@ -1,11 +1,11 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 56;
+const PAGE_BUILD = 57;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
-let markerSettings = { iconsOnly: false, transparent: false, size: "normal", position: "below", color: "#183d2a" };
+let markerSettings = { iconsOnly: false, size: "normal", position: "below", color: "#183d2a" };
 try {
   const preferences = JSON.parse(localStorage.getItem(markerSettingsKey));
   if (preferences && Object.hasOwn(markerSizes, preferences.size) && /^#[0-9a-f]{6}$/i.test(preferences.color)) {
@@ -1048,7 +1048,6 @@ function setSignedIn(value) {
 
 $("marker-settings").onclick = () => {
   $("markers-only").checked = markerSettings.iconsOnly;
-  $("markers-transparent").checked = markerSettings.transparent;
   $("marker-label-size").value = markerSettings.size;
   $("marker-label-position").value = markerSettings.position;
   $("marker-label-color").value = markerSettings.color;
@@ -1064,7 +1063,7 @@ $("marker-settings-form").onsubmit = event => {
   const color = $("marker-label-color").value;
   if (!Object.hasOwn(markerSizes, size) || !/^#[0-9a-f]{6}$/i.test(color)) return;
   markerSettings = {
-    iconsOnly: $("markers-only").checked, transparent: $("markers-transparent").checked,
+    iconsOnly: $("markers-only").checked,
     size, position: position === "above" ? "above" : "below", color
   };
   try { localStorage.setItem(markerSettingsKey, JSON.stringify(markerSettings)); } catch {}
@@ -1145,8 +1144,3 @@ if (window.location.protocol === "file:") {
 }
 
 $("export-pdf").onclick = exportPdf;
-
-$("current-space-icon").onclick = openAppearance;
-$("appearance-save").onclick = saveAppearance;
-$("appearance-close").onclick = () => { if (!appearanceSaving) $("appearance-dialog").close(); };
-$("appearance-dialog").oncancel = event => { if (appearanceSaving) event.preventDefault(); };

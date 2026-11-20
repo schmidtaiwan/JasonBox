@@ -279,5 +279,23 @@ const drive = (() => {
     return data.storageQuota;
   }
 
-  return { login, logout, readEntries, save, moveItem, remove, photo, spacePhotos, touch, quota, account: () => accountInfo, SessionExpired };
+  let floorSnapshotFile;
+
+  async function readFloorSnapshot() {
+    const [file] = await list("'" + root + "' in parents and appProperties has { key='jasonBoxFloorSnapshot' and value='1' }");
+    floorSnapshotFile = file?.id;
+    if (!file) return null;
+    const response = await request(filesUrl + "/" + encodeURIComponent(file.id) + "?alt=media");
+    return response.json();
+  }
+
+  async function writeFloorSnapshot(snapshot) {
+    const type = "application/json";
+    const metadata = { name: ".jasonbox-floor-snapshot.json", mimeType: type, appProperties: { jasonBoxFloorSnapshot: "1" } };
+    if (!floorSnapshotFile) metadata.parents = [root];
+    const file = await write(metadata, floorSnapshotFile, new Blob([JSON.stringify(snapshot)], { type }), type);
+    floorSnapshotFile = file.id;
+  }
+
+  return { login, logout, readEntries, readFloorSnapshot, writeFloorSnapshot, save, moveItem, remove, photo, spacePhotos, touch, quota, account: () => accountInfo, SessionExpired };
 })();

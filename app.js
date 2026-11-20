@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 61;
+const PAGE_BUILD = 62;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -29,6 +29,8 @@ $("view-list").onclick = () => setDisplayMode("list");
 $("view-preview").onclick = () => setDisplayMode("preview");
 $("view-details").onclick = () => setDisplayMode("details");
 let entries = [];
+let floorSnapshotOnly = false;
+let pendingSnapshotSpace;
 let current = null;
 let signedIn = false;
 let navigationHistory = [];
@@ -97,8 +99,8 @@ const thumbnails = new IntersectionObserver(changes => {
   }
 }, { rootMargin: "150px" });
 
-async function refresh({ initial = false } = {}) {
-  entries = (await drive.readEntries()).filter(entry => !photoUploads.has(entry.id));
+async function refresh({ initial = false, records } = {}) {
+  entries = (records ?? await drive.readEntries()).filter(entry => !photoUploads.has(entry.id));
   entries.push(...Array.from(photoUploads.values(), job => job.local));
   for (let floor = 1; floor <= 4; floor++) {
     const existing = entries.find(entry => entry.level === 0 && floorNumber(entry.name) === floor);
@@ -138,6 +140,12 @@ function button(content, className, action) {
 }
 
 function navigate(entry, remember = true) {
+  if (floorSnapshotOnly && entry?.level > 0) {
+    pendingSnapshotSpace = entry.id;
+    $("mutation-status").textContent = "正在載入此空間的物品與照片…";
+    return;
+  }
+  pendingSnapshotSpace = undefined;
   planAdjustment = null;
   if (remember && current?.id !== entry?.id) navigationHistory.push({ id: current?.id ?? null, x: window.scrollX, y: window.scrollY, query: $("search").value });
   current = entry;
@@ -165,11 +173,12 @@ function openItem(entry) {
 }
 
 function displayThumbnail(placeholder, entry) {
-  if (entry.photo) {
+  const cached = entry.level === 1 ? floorThumbs.get(floorPhotoKey(entry)) : undefined;
+  if (entry.photo || cached) {
     const img = element("img", "", "thumb");
     img.alt = "";
-    img.src = URL.createObjectURL(entry.photo);
-    objectUrls.push(img.src);
+    img.src = entry.photo ? URL.createObjectURL(entry.photo) : cached;
+    if (entry.photo) objectUrls.push(img.src);
     placeholder.replaceWith(img);
   } else if (entry.hasPhoto) {
     placeholder.dataset.id = entry.photoId || entry.id;
@@ -239,6 +248,7 @@ async function sendPhotoUpload(job) {
     if (current?.id === job.id) current = saved;
     if (signedIn && (job.record.photo || job.record.extraPhotos?.length)) void refreshQuota();
     await touchParent(saved.parent);
+    void updateFloorSnapshot();
   } catch (error) {
     job.failed = true;
     $("mutation-status").textContent = "背景儲存失敗：" + error.message + "。點選失敗項目可重試。";
@@ -533,7 +543,7 @@ function render() {
   $("list-title").textContent = query ? "搜尋結果" : !current || current.level === 0 ? "存放空間" : "內部位置與物品";
   $("count").textContent = visible.length + (depth === 4 && !query ? " 件" : " 筆");
   $("add").hidden = false;
-  $("add").disabled = !signedIn || !current;
+  $("add").disabled = !signedIn || !current || floorSnapshotOnly;
   $("add").title = current ? "加入到「" + ancestors(current).map(entry => entry.name).join(" / ") + "」" : "請先選擇樓層、櫃子或內部位置";
   $("back").disabled = !signedIn || (!current && !navigationHistory.length && !query);
   document.querySelector("footer").hidden = !signedIn;
@@ -671,6 +681,7 @@ $("move-form").onsubmit = async event => {
 };
 
 function edit(entry, placement) {
+  if (floorSnapshotOnly) return;
   if (entry && photoUploads.has(entry.id)) {
     openItem(entry);
     return;
@@ -958,6 +969,7 @@ $("remove").onclick = async () => {
     entries = entries.filter(item => item.id !== entry.id);
     if (current?.id === entry.id) current = entries.find(item => item.id === entry.parent) ?? null;
     await touchParent(entry.parent);
+    void updateFloorSnapshot();
     closeEditor();
     render();
   } catch (error) {
@@ -1065,6 +1077,7 @@ function setSignedIn(value) {
   signedIn = value;
   $("marker-settings").hidden = !signedIn;
   $("export-pdf").hidden = !signedIn;
+  $("export-pdf").disabled = floorSnapshotOnly;
   document.querySelector("main").hidden = !signedIn;
   document.querySelector("footer").hidden = !signedIn;
   $("gate").hidden = signedIn;
@@ -1132,6 +1145,9 @@ function signOut(message = "") {
   if (editor.open) closeEditor();
   if (snapshotDialog.open) snapshotDialog.close();
   thumbnailCache.clear();
+  clearFloorSnapshot();
+  floorSnapshotOnly = false;
+  pendingSnapshotSpace = undefined;
   drive.logout();
   entries = [];
   navigate(null, false);
@@ -1157,8 +1173,28 @@ $("login").onclick = async () => {
   $("login-status").textContent = "正在連接 Google Drive…";
   try {
     await drive.login({ clientId, owner });
-    await refresh({ initial: true });
-    setSignedIn(true);
+    const details = drive.readEntries().then(records => ({ records }), error => ({ error }));
+    const snapshot = await drive.readFloorSnapshot().catch(() => null);
+    const quickRecords = restoreFloorSnapshot(snapshot);
+    if (quickRecords) {
+      entries = quickRecords;
+      current = entries.find(entry => entry.level === 0 && floorNumber(entry.name) === 1) ?? null;
+      floorSnapshotOnly = true;
+      setSignedIn(true);
+      render();
+      $("mutation-status").textContent = "已載入平面圖，正在背景載入物品清單…";
+    }
+    const result = await details;
+    if (!drive.account()) return;
+    if (result.error) throw result.error;
+    floorSnapshotOnly = false;
+    await refresh({ initial: !quickRecords, records: result.records });
+    if (!quickRecords) setSignedIn(true);
+    else $("export-pdf").disabled = false;
+    $("mutation-status").textContent = "";
+    const requested = entries.find(entry => entry.id === pendingSnapshotSpace);
+    if (requested) navigate(requested);
+    void updateFloorSnapshot();
   } catch (error) {
     signOut(error.message);
   } finally {

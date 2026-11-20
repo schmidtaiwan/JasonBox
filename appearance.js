@@ -11,22 +11,10 @@ function spaceAppearance(entry) {
   return { photoOnly: Boolean(entry.hasPhoto || entry.photo), color };
 }
 
-const iconPhotoCache = new Map();
 let photoClipSequence = 0;
 function addPhotoThumbnail(svg, entry, size, color) {
   if (!entry.hasPhoto && !entry.photo) return;
-  const key = (entry.photoId || entry.id) + ":" + entry.updatedAt;
-  let pending = entry.photo ? Promise.resolve(entry.photo) : iconPhotoCache.get(key);
-  if (!pending) {
-    pending = drive.photo(entry.photoId || entry.id);
-    iconPhotoCache.set(key, pending);
-    pending.catch(() => iconPhotoCache.delete(key));
-    if (iconPhotoCache.size > 24) iconPhotoCache.delete(iconPhotoCache.keys().next().value);
-  }
-  pending.then(blob => {
-    if (!svg.isConnected) return;
-    const url = URL.createObjectURL(blob);
-    objectUrls.push(url);
+  const draw = url => {
     const radius = size / 2;
     const image = svgNode("image", {
       href: url, x: -radius, y: -radius, width: size, height: size,
@@ -43,6 +31,16 @@ function addPhotoThumbnail(svg, entry, size, color) {
     rim.style.stroke = color;
     rim.style.strokeWidth = "1.5";
     svg.append(defs, image, rim);
+  };
+  const cached = floorThumbs.get(floorPhotoKey(entry));
+  if (cached && !entry.photo) { draw(cached); return; }
+  if (floorSnapshotOnly) return;
+  const pending = entry.photo ? Promise.resolve(entry.photo) : loadSnapshotPhoto(entry.photoId || entry.id, entry.updatedAt);
+  pending.then(blob => {
+    if (!svg.isConnected) return;
+    const url = URL.createObjectURL(blob);
+    objectUrls.push(url);
+    draw(url);
   }).catch(() => {});
 }
 function spaceIconNode(entry) {

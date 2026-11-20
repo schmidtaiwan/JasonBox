@@ -37,7 +37,7 @@ test('PDF export includes cover and album photos within scope even when there ar
 });
 
 class Node {
-  constructor() { this.value = ''; this.children = []; this.open = false; this.style = {}; this.attrs = {}; }
+  constructor() { this.value = ''; this.children = []; this.open = false; this.style = {}; this.attrs = {}; this.dataset = {}; }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
   replaceWith(node) { this.replacement = node; }
@@ -85,7 +85,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     }
   };
   vm.createContext(context);
-  for (const file of ['appearance.js', 'photo.js', 'plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['appearance.js', 'floor-cache.js', 'photo.js', 'plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
   assert.ok(run('changeDescription({updatedAt: "2026-11-19T04:00:00Z",updatedBy:"backy2777@example.com"})').endsWith(' · BACKY2777'));
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
@@ -499,6 +499,27 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const uploadedPhotos = records.filter(record => record.parent === 'left' && record.photo);
   assert.equal(uploadedPhotos.length, 2);
   assert.ok(uploadedPhotos.every(record => /^物品照片 /.test(record.name)));
+  const storedEntries = records.map(record => ({ ...record }));
+  let finishDetails;
+  context.window.GOOGLE_CONFIG = { clientId: 'mock-client', preferredEmail: 'test@example.com' };
+  context.drive.login = async () => {};
+  context.drive.readEntries = () => new Promise(resolve => { finishDetails = resolve; });
+  const cachedMap = storedEntries.filter(record => record.level === 0 || record.id === storage.id);
+  cachedMap.find(record => record.id === storage.id).photoId = 'map-photo';
+  cachedMap.find(record => record.id === storage.id).hasPhoto = true;
+  context.drive.readFloorSnapshot = async () => ({ schema: 1, records: cachedMap, thumbs: { 'map-photo:': 'data:image/jpeg;base64,YQ==' } });
+  get('view-details').onclick();
+  const signingIn = get('login').onclick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(run('floorSnapshotOnly'), true, 'floor snapshot renders before the delayed inventory');
+  assert.equal(run('current.name'), '1F');
+  assert.equal(run('floorThumbs.get("map-photo:")'), 'data:image/jpeg;base64,YQ==');
+  get('floor-tabs').children[1].onclick();
+  finishDetails(storedEntries);
+  await signingIn;
+  assert.equal(run('floorSnapshotOnly'), false);
+  assert.equal(run('current.name'), '2F', 'detail loading preserves the floor selected from the snapshot');
+  assert.ok(run('entries.some(entry => entry.level === 4)'));
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 59;
+const PAGE_BUILD = 60;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -342,8 +342,13 @@ async function showSnapshot() {
   $("snapshot-count").textContent = (snapshotIndex + 1) + " / " + snapshotRecords.length;
   $("snapshot-previous").disabled = snapshotIndex === 0;
   $("snapshot-next").disabled = snapshotIndex === snapshotRecords.length - 1;
-  $("snapshot-status").textContent = "載入照片…";
+  $("snapshot-edit").hidden = record.level !== 4;
   const request = ++snapshotRequest;
+  if (!record.hasPhoto && !record.photo) {
+    $("snapshot-status").textContent = "這件物品沒有照片";
+    return;
+  }
+  $("snapshot-status").textContent = "載入照片…";
   try {
     const blob = record.photo || await loadSnapshotPhoto(record.photoId || record.id, record.updatedAt);
     if (!snapshotDialog.open || request !== snapshotRequest) return;
@@ -365,6 +370,13 @@ function stepSnapshot(direction) {
 }
 $("snapshot-previous").onclick = () => stepSnapshot(-1);
 $("snapshot-next").onclick = () => stepSnapshot(1);
+$("snapshot-edit").onclick = () => {
+  const record = snapshotRecords[snapshotIndex];
+  const item = record?.level === 4 && entries.find(entry => entry.id === record.id);
+  if (!item) return;
+  snapshotDialog.close();
+  openItem(item);
+};
 snapshotDialog.onkeydown = event => {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
   event.preventDefault();
@@ -387,11 +399,10 @@ snapshotStage.onpointerup = event => {
   if (Math.abs(dx) >= 44 && Math.abs(dx) > Math.abs(dy) * 1.3) stepSnapshot(dx < 0 ? 1 : -1);
 };
 
-function snapshotTile(record, fallback, groups) {
+function snapshotTile(record, groups) {
   const hasPhoto = record.hasPhoto || record.photo;
   const tile = button("", "snapshot-tile", () => {
-    if (!hasPhoto) return fallback();
-    snapshotRecords = groups.flat().filter(item => item.hasPhoto || item.photo);
+    snapshotRecords = groups.flat();
     snapshotIndex = snapshotRecords.indexOf(record);
     snapshotDialog.showModal();
     void showSnapshot();
@@ -417,7 +428,7 @@ async function renderSnapshots(query, generation) {
   const spaces = exportSpaces().filter(space => !query || space.name.toLocaleLowerCase().includes(query));
   const groups = [items];
   $("count").textContent = items.length + " 件物品";
-  if (items.length) snapshotGroup("物品").append(...items.map(item => snapshotTile(item, () => openItem(item), groups)));
+  if (items.length) snapshotGroup("物品").append(...items.map(item => snapshotTile(item, groups)));
   if (!items.length && !spaces.length) $("list").append(element("p", "沒有符合的照片或物品。", "empty"));
   const albums = [];
   for (const space of spaces) {
@@ -427,7 +438,7 @@ async function renderSnapshots(query, generation) {
     if (space.hasPhoto) {
       const cover = { ...space, name: space.name + "・封面" };
       records.push(cover);
-      grid.append(snapshotTile(cover, () => navigate(space), groups));
+      grid.append(snapshotTile(cover, groups));
     }
     if (space.spaceAlbum) albums.push({ space, grid, records });
   }
@@ -440,7 +451,7 @@ async function renderSnapshots(query, generation) {
           id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true, location: space.location
         }));
         records.push(...photos);
-        grid.append(...photos.map(photo => snapshotTile(photo, () => navigate(space), groups)));
+        grid.append(...photos.map(photo => snapshotTile(photo, groups)));
       } catch {
         if (generation === snapshotGeneration) grid.append(element("p", "無法載入空間相簿。", "muted"));
       }

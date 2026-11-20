@@ -468,9 +468,15 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   stage.onpointerdown({ pointerId: 1, button: 0, clientX: 150, clientY: 10 });
   stage.onpointerup({ pointerId: 1, clientX: 50, clientY: 15 });
   assert.equal(get('snapshot-title').textContent, '第二張');
-  assert.equal(get('snapshot-count').textContent, '2 / 2');
+  assert.match(get('snapshot-count').textContent, /\/ 3$/);
   get('snapshot-previous').onclick();
   assert.equal(get('snapshot-title').textContent, '第一張');
+  get('snapshot-close').onclick();
+  tiles.find(tile => tile.children[1].textContent === 'stay').onclick();
+  assert.equal(get('snapshot-title').textContent, 'stay');
+  assert.equal(get('snapshot-image').hidden, true);
+  assert.equal(get('snapshot-status').textContent, '這件物品沒有照片');
+  assert.equal(get('snapshot-edit').hidden, false);
   get('snapshot-close').onclick();
   get('add').onclick();
   const kinds = get('add-kind').children;

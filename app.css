@@ -190,6 +190,8 @@ footer { z-index: 20; }
 #snapshot-image { display: block; width: 100%; max-height: 65dvh; object-fit: contain; }
 .snapshot-navigation { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }
 .snapshot-navigation button { min-width: 44px; font-size: 1.35rem; }
+.snapshot-navigation-center { display: flex; align-items: center; gap: 8px; }
+#snapshot-edit { font-size: .85rem; }
 .add-kind-field { border: 0; padding: 0; margin: 18px 0; min-width: 0; }
 .add-kind-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
 .add-kind-grid button { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: #fffefa; }

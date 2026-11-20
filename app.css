@@ -236,7 +236,7 @@ footer { z-index: 20; }
 #move-list label { min-height: 44px; display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
 #move-list input { flex: none; width: 18px; height: 18px; accent-color: var(--green); }
 .space-photo-icon .space-choice-icon { width: 32px; height: 32px; }
-.space-photo-marker .space-photo-icon { background: transparent; border-color: transparent; box-shadow: none; }
+.space-photo-marker .space-photo-icon { --space-photo-rim: var(--marker-bg); background: transparent; border-color: var(--marker-bg); box-shadow: 0 0 0 1px var(--marker-fg); }
 
 .current-space-icon { margin-left: 0; width: 48px; height: 48px; padding: 2px; flex: 0 0 48px; border: 0; background: transparent; }
 .current-space-icon .space-choice-icon { width: 44px; height: 44px; }

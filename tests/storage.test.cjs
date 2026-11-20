@@ -92,6 +92,10 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
   assert.equal(run('markerTone([0,0,0,255])'), 'light', 'dark photo uses light markers');
   assert.equal(run('markerTone([0,0,0,0])'), 'dark', 'transparent photo is treated as white');
+  assert.equal(run('markerRingTone({width:9,height:9,data:Uint8ClampedArray.from({length:324},(_,i)=>i%4===3||Math.floor(i/4)===40?255:0)},4,4,3,3)'), 'light',
+    'a bright center surrounded by a dark background gets a light rim');
+  assert.equal(run('markerRingTone({width:9,height:9,data:Uint8ClampedArray.from({length:324},(_,i)=>i%4===3||Math.floor(i/4)!==40?255:0)},4,4,3,3)'), 'dark',
+    'a dark center surrounded by a bright background gets a dark rim');
   assert.equal(run('floorPlanY(42, 1)'), 1, 'rear balcony grows 50% outwards');
   assert.equal(run('floorPlanY(874, 1)'), 945, 'garage grows 50% outwards');
   assert.equal(run('floorPlanY(945, 1, true)'), 874, 'dragging saves in the original coordinate system');

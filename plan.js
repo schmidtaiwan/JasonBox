@@ -316,7 +316,7 @@ function renderFloorPlans(query) {
     : [0, floorPlanTop, 1672, floorPlanHeight];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
   const alignmentMarkers = [];
-  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=70", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
+  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=71", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     const markerFloor = floorNumber(ancestors(entry)[0]?.name || "");
@@ -407,6 +407,19 @@ function markerTone(pixels) {
   return average + .05 >= .0525 / (average + .05) ? "dark" : "light";
 }
 let spaceLayoutGeneration = 0;
+function markerRingTone(sample, x, y, radiusX, radiusY) {
+  const count = 16;
+  const ring = new Uint8ClampedArray(count * 4);
+  for (let i = 0; i < count; i++) {
+    const angle = i * Math.PI * 2 / count;
+    const px = Math.max(0, Math.min(sample.width - 1, Math.round(x + radiusX * Math.cos(angle))));
+    const py = Math.max(0, Math.min(sample.height - 1, Math.round(y + radiusY * Math.sin(angle))));
+    const offset = (py * sample.width + px) * 4;
+    ring.set(sample.data.subarray(offset, offset + 4), i * 4);
+  }
+  return markerTone(ring);
+}
+
 function addResizableSpacePhoto(host, canvas, image, spaceId) {
   const key = "jasonbox-space-photo-height:" + spaceId;
   const minimum = 120;
@@ -527,14 +540,17 @@ function renderSpaceLayout(query) {
   };
   let samples;
   const markers = [];
-  const recolor = (marker, value) => {
+  const recolor = (marker, icon, value) => {
     if (!samples) return;
     const [displayX, displayY] = displayPoint(value);
-    const x = Math.round(displayX * (samples.width - 1));
-    const y = Math.round(displayY * (samples.height - 1));
-    const left = Math.max(0, x - 8), top = Math.max(0, y - 8);
-    const pixels = samples.context.getImageData(left, top, Math.min(17, samples.width - left), Math.min(17, samples.height - top)).data;
-    marker.setAttribute("data-tone", markerTone(pixels));
+    const photoBounds = image.getBoundingClientRect();
+    const iconBounds = icon.getBoundingClientRect();
+    const scaleX = samples.width / Math.max(1, photoBounds.width);
+    const scaleY = samples.height / Math.max(1, photoBounds.height);
+    const x = iconBounds.width ? (iconBounds.left + iconBounds.width / 2 - photoBounds.left) * scaleX : displayX * samples.width;
+    const y = iconBounds.height ? (iconBounds.top + iconBounds.height / 2 - photoBounds.top) * scaleY : displayY * samples.height;
+    marker.setAttribute("data-tone", markerRingTone(samples, x, y,
+      (iconBounds.width / 2 + 2) * scaleX, (iconBounds.height / 2 + 2) * scaleY));
   };
   image.onload = () => {
     if (generation !== spaceLayoutGeneration) return;
@@ -546,8 +562,8 @@ function renderSpaceLayout(query) {
       sample.height = Math.max(1, Math.round(image.naturalHeight * scale));
       const context = sample.getContext("2d", { willReadFrequently: true });
       context.drawImage(image, 0, 0, sample.width, sample.height);
-      samples = { width: sample.width, height: sample.height, context };
-      for (const item of markers) recolor(item.marker, item.value);
+      samples = context.getImageData(0, 0, sample.width, sample.height);
+      for (const item of markers) recolor(item.marker, item.icon, item.value);
     } catch {
       // The default black badge with a white outline remains legible if sampling is unavailable.
       samples = undefined;
@@ -587,14 +603,14 @@ function renderSpaceLayout(query) {
       marker.append(label);
     }
     marker.setAttribute("data-tone", "dark");
-    const appearance = { marker, value: position };
+    const appearance = { marker, icon: iconHost, value: position };
     markers.push(appearance);
     const place = value => {
       const [x, y] = displayPoint(value);
       marker.style.left = x * 100 + "%";
       marker.style.top = y * 100 + "%";
       appearance.value = value;
-      recolor(marker, value);
+      recolor(marker, iconHost, value);
     };
     place(position);
     let drag;

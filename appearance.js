@@ -28,7 +28,7 @@ function addPhotoThumbnail(svg, entry, size, color) {
     image.setAttribute("clip-path", "url(#" + clipId + ")");
     const rim = svgNode("circle", { r: radius, "pointer-events": "none" });
     rim.style.fill = "none";
-    rim.style.stroke = color;
+    rim.style.stroke = "var(--space-photo-rim, " + color + ")";
     rim.style.strokeWidth = "1.5";
     svg.append(defs, image, rim);
   };

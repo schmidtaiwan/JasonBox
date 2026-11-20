@@ -390,6 +390,12 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.ok(targets.some(option => option.value === 'right' && option.textContent.startsWith('同層')));
   assert.ok(targets.some(option => option.value === 'left-child' && option.textContent.startsWith('下一層')));
   assert.equal(run('spaceAppearance({hasPhoto:true}).icon[0]'), 'photo-only');
+  const circleThumb = run('const photoTestSvg = svgNode("svg", {}); photoTestSvg.isConnected = true; addPhotoThumbnail(photoTestSvg, {photo:new Blob(["photo"])}, 38, true); photoTestSvg');
+  await Promise.resolve();
+  const clip = circleThumb.children[0].children[0];
+  assert.equal(Number(clip.children[0].attrs.r), 19);
+  assert.equal(circleThumb.children[1].attrs['clip-path'], 'url(#' + clip.attrs.id + ')');
+  assert.equal(circleThumb.children[1].attrs.preserveAspectRatio, 'xMidYMid slice');
   assert.equal(run('spaceAppearance({hasPhoto:true,iconKey:"bed"}).icon[0]'), 'bed');
   assert.equal(run('spaceAppearance({hasPhoto:false}).icon[0]'), 'cabinet');
   for (const id of ['move-a', 'move-b']) {

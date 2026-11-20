@@ -25,6 +25,7 @@ function spaceAppearance(entry) {
   };
 }
 const iconPhotoCache = new Map();
+let photoClipSequence = 0;
 function addPhotoThumbnail(svg, entry, size, transparent = false) {
   if (!entry.hasPhoto && !entry.photo) return;
   const key = (entry.photoId || entry.id) + ":" + entry.updatedAt;
@@ -39,7 +40,26 @@ function addPhotoThumbnail(svg, entry, size, transparent = false) {
     if (!svg.isConnected) return;
     const url = URL.createObjectURL(blob);
     objectUrls.push(url);
-    svg.append(svgNode("image", { href: url, x: -size / 2, y: -size / 2, width: size, height: size, preserveAspectRatio: transparent ? "xMidYMid meet" : "xMidYMid slice", "pointer-events": "none" }));
+    const radius = size / 2;
+    const image = svgNode("image", {
+      href: url, x: -radius, y: -radius, width: size, height: size,
+      preserveAspectRatio: "xMidYMid slice", "pointer-events": "none"
+    });
+    if (!transparent) {
+      svg.append(image);
+      return;
+    }
+    const clipId = "space-photo-clip-" + ++photoClipSequence;
+    const clip = svgNode("clipPath", { id: clipId });
+    clip.append(svgNode("circle", { r: radius }));
+    const defs = svgNode("defs", {});
+    defs.append(clip);
+    image.setAttribute("clip-path", "url(#" + clipId + ")");
+    const rim = svgNode("circle", { r: radius, "pointer-events": "none" });
+    rim.style.fill = "none";
+    rim.style.stroke = "#b6c9ba";
+    rim.style.strokeWidth = "1.5";
+    svg.append(defs, image, rim);
   }).catch(() => {});
 }
 function spaceIconNode(entry) {

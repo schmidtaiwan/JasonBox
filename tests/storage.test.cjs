@@ -4,6 +4,24 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 
+test('Gemini recognition posts the chosen photo to the configured Vertex AI project', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'gemini.js'), 'utf8');
+  const requests = [];
+  const context = {
+    fetch: async (url, options) => {
+      requests.push({ url, ...options });
+      return { ok: true, status: 200, json: async () => ({
+        candidates: [{ content: { parts: [{ text: '["剪刀","清潔刷"]' }] } }]
+      }) };
+    }
+  };
+  const names = await vm.runInNewContext(source + '\ngemini.recognize("jasonbox-test", "temporary-token", "YQ==")', context);
+  assert.deepEqual(Array.from(names), ['剪刀', '清潔刷']);
+  assert.match(requests[0].url, /projects\/jasonbox-test\/locations\/global\/publishers\/google\/models\/gemini-3\.1-flash-lite:generateContent$/);
+  assert.equal(requests[0].headers.Authorization, 'Bearer temporary-token');
+  assert.equal(JSON.parse(requests[0].body).contents[0].parts[1].inlineData.data, 'YQ==');
+});
+
 test('PDF export includes cover and album photos within scope even when there are no items', async () => {
   const floor = { id: 'floor', level: 0, name: '1F' };
   const space = { id: 'space', parent: 'floor', level: 1, name: '櫃子', photoId: 'cover', hasPhoto: true, spaceAlbum: true };
@@ -86,7 +104,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     }
   };
   vm.createContext(context);
-  for (const file of ['appearance.js', 'floor-cache.js', 'photo.js', 'plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['appearance.js', 'floor-cache.js', 'photo.js', 'plan.js', 'export.js', 'gemini.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
   assert.ok(run('changeDescription({updatedAt: "2026-11-19T04:00:00Z",updatedBy:"backy2777@example.com"})').endsWith(' · BACKY2777'));
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
@@ -470,9 +488,12 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   tiles.find(tile => tile.children[1].textContent === '第一張').onclick();
   assert.equal(get('snapshot-title').textContent, '第一張');
   assert.match(get('snapshot-location').textContent, /^存放位置：.*\/ 床底下 \/ 左$/);
-  run('recognizeSnapshot = async () => ["bottle", "scissors", "person"]');
   await get('snapshot-recognize').onclick();
-  assert.equal(get('snapshot-recognition-status').textContent, '辨識建議：瓶子、剪刀');
+  assert.equal(get('gemini-settings').open, true);
+  get('gemini-project').value = 'jasonbox-test';
+  run('recognizeSnapshot = async () => ["瓶子", "剪刀"]');
+  await get('snapshot-recognize').onclick();
+  assert.equal(get('snapshot-recognition-status').textContent, 'Gemini 辨識建議：瓶子、剪刀');
   get('snapshot-use-suggestions').onclick();
   assert.equal(get('snapshot-add-name').value, '瓶子 剪刀');
   assert.ok(!records.some(record => record.name === '瓶子'), 'recognition does not write until the user submits');

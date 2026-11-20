@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 68;
+const PAGE_BUILD = 69;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -330,7 +330,8 @@ let snapshotUrl;
 let snapshotRecords = [];
 let snapshotIndex = 0;
 let snapshotGesture;
-let recognitionWorker;
+const geminiProjectKey = "jasonbox-gemini-project";
+try { $("gemini-project").value = localStorage.getItem(geminiProjectKey) || ""; } catch {}
 let recognitionBusy = false;
 let recognitionSuggestions = [];
 const snapshotDialog = $("snapshot-dialog");
@@ -367,6 +368,7 @@ async function showSnapshot() {
   $("snapshot-recognition-status").textContent = "";
   $("snapshot-use-suggestions").hidden = true;
   $("snapshot-recognize").hidden = !record.hasPhoto && !record.photo;
+  $("gemini-settings").hidden = $("snapshot-recognize").hidden;
   $("snapshot-recognize").disabled = true;
   const request = ++snapshotRequest;
   if (!record.hasPhoto && !record.photo) {
@@ -407,64 +409,47 @@ $("snapshot-add").onclick = () => {
   if (!form.hidden) $("snapshot-add-name").focus();
 };
 
-const recognizedNames = {
-  backpack: "背包", handbag: "手提包", suitcase: "行李箱", umbrella: "雨傘",
-  bottle: "瓶子", "wine glass": "酒杯", cup: "杯子", fork: "叉子", knife: "刀子", spoon: "湯匙", bowl: "碗",
-  banana: "香蕉", apple: "蘋果", orange: "橘子", broccoli: "花椰菜", carrot: "紅蘿蔔",
-  chair: "椅子", couch: "沙發", "potted plant": "盆栽", bed: "床", "dining table": "餐桌", toilet: "馬桶",
-  tv: "電視", laptop: "筆電", mouse: "滑鼠", remote: "遙控器", keyboard: "鍵盤", "cell phone": "手機",
-  microwave: "微波爐", oven: "烤箱", toaster: "烤麵包機", sink: "水槽", refrigerator: "冰箱",
-  book: "書本", clock: "時鐘", vase: "花瓶", scissors: "剪刀", "teddy bear": "玩具熊",
-  "hair drier": "吹風機", toothbrush: "牙刷", "sports ball": "球", "tennis racket": "網球拍"
-};
-
-async function recognizeSnapshot(image) {
+async function recognizeSnapshot(image, project, request) {
+  const owner = drive.account()?.email;
+  if (!owner) throw new Error("請先登入收納管家。");
+  const token = await gemini.authorize(window.GOOGLE_CONFIG, owner);
   await image.decode();
-  const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
+  if (!snapshotDialog.open || request !== snapshotRequest) return [];
+  const scale = Math.min(1, 1200 / Math.max(image.naturalWidth, image.naturalHeight));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
   canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  const { data: pixels } = context.getImageData(0, 0, canvas.width, canvas.height);
-  recognitionWorker ||= new Worker("recognition-worker.js?v=" + PAGE_BUILD);
-  const worker = recognitionWorker;
-  return new Promise((resolve, reject) => {
-    const fail = () => {
-      clearTimeout(timeout);
-      worker.terminate();
-      recognitionWorker = undefined;
-      reject(new Error("照片辨識未完成"));
-    };
-    const timeout = setTimeout(fail, 45000);
-    worker.onerror = fail;
-    worker.onmessage = ({ data }) => {
-      if (!Array.isArray(data?.names)) return fail();
-      clearTimeout(timeout);
-      resolve(data.names);
-    };
-    worker.postMessage({ pixels, width: canvas.width, height: canvas.height }, [pixels.buffer]);
-  });
+  canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+  const jpeg = canvas.toDataURL("image/jpeg", .82).split(",")[1];
+  return gemini.recognize(project, token, jpeg);
 }
 
 $("snapshot-recognize").onclick = async () => {
   const image = $("snapshot-image");
   if (recognitionBusy || image.hidden) return;
+  const input = $("gemini-project");
+  const project = input.value.trim();
+  if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project)) {
+    $("gemini-settings").open = true;
+    $("snapshot-recognition-status").textContent = "請填入已啟用 Vertex AI 的 Google Cloud 專案 ID，再按 Gemini 辨識。";
+    input.focus();
+    return;
+  }
+  try { localStorage.setItem(geminiProjectKey, project); } catch {}
   const request = snapshotRequest;
   recognitionBusy = true;
   $("snapshot-recognize").disabled = true;
   $("snapshot-use-suggestions").hidden = true;
-  $("snapshot-recognition-status").textContent = "正在辨識，第一次會先下載模型…";
+  $("snapshot-recognition-status").textContent = "正在連線至 Google Gemini…";
   try {
-    const names = await recognizeSnapshot(image);
+    const names = await recognizeSnapshot(image, project, request);
     if (!snapshotDialog.open || request !== snapshotRequest) return;
-    recognitionSuggestions = names.filter(name => typeof name === "string" && name !== "person")
-      .map(name => Object.hasOwn(recognizedNames, name) ? recognizedNames[name] : name.replaceAll(" ", "-"));
+    recognitionSuggestions = [...new Set(names)];
     $("snapshot-recognition-status").textContent = recognitionSuggestions.length
-      ? "辨識建議：" + recognitionSuggestions.join("、") : "未辨識到支援的物品，可手動加入名稱。";
+      ? "Gemini 辨識建議：" + recognitionSuggestions.join("、") : "Gemini 未辨識到明確的物品，可手動加入名稱。";
     $("snapshot-use-suggestions").hidden = !recognitionSuggestions.length || !snapshotStorage(snapshotRecords[snapshotIndex]);
-  } catch {
-    if (snapshotDialog.open && request === snapshotRequest) $("snapshot-recognition-status").textContent = "辨識未完成，請重試或手動加入物品。";
+  } catch (error) {
+    if (snapshotDialog.open && request === snapshotRequest) $("snapshot-recognition-status").textContent = error.message;
   } finally {
     recognitionBusy = false;
     $("snapshot-recognize").disabled = $("snapshot-image").hidden;
@@ -1229,6 +1214,7 @@ function signOut(message = "") {
   if (editor.open) closeEditor();
   if (snapshotDialog.open) snapshotDialog.close();
   thumbnailCache.clear();
+  gemini.clear();
   clearFloorSnapshot();
   floorSnapshotOnly = false;
   pendingSnapshotSpace = undefined;

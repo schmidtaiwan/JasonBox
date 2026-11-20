@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 60;
+const PAGE_BUILD = 61;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -201,6 +201,7 @@ function queuePhotoUpload(record, { preserveMap = false } = {}) {
     render();
   }
   job.completion = sendPhotoUpload(job);
+  return job;
 }
 
 async function sendPhotoUpload(job) {
@@ -343,6 +344,11 @@ async function showSnapshot() {
   $("snapshot-previous").disabled = snapshotIndex === 0;
   $("snapshot-next").disabled = snapshotIndex === snapshotRecords.length - 1;
   $("snapshot-edit").hidden = record.level !== 4;
+  $("snapshot-add").hidden = !snapshotStorage(record);
+  $("snapshot-add-form").hidden = true;
+  $("snapshot-add").setAttribute("aria-expanded", "false");
+  $("snapshot-add-name").value = "";
+  $("snapshot-add-status").textContent = "";
   const request = ++snapshotRequest;
   if (!record.hasPhoto && !record.photo) {
     $("snapshot-status").textContent = "這件物品沒有照片";
@@ -370,6 +376,36 @@ function stepSnapshot(direction) {
 }
 $("snapshot-previous").onclick = () => stepSnapshot(-1);
 $("snapshot-next").onclick = () => stepSnapshot(1);
+function snapshotStorage(record) {
+  const id = record?.spaceId ?? (record?.level === 4 ? record.parent : record?.id);
+  return entries.find(entry => entry.id === id && entry.level > 0 && entry.level < 4);
+}
+$("snapshot-add").onclick = () => {
+  const form = $("snapshot-add-form");
+  form.hidden = !form.hidden;
+  $("snapshot-add").setAttribute("aria-expanded", String(!form.hidden));
+  if (!form.hidden) $("snapshot-add-name").focus();
+};
+$("snapshot-add-form").onsubmit = async event => {
+  event.preventDefault();
+  const space = snapshotStorage(snapshotRecords[snapshotIndex]);
+  if (!space) return;
+  const names = splitItemNames($("snapshot-add-name").value);
+  if (!names.length || names.some(name => name.length > 80)) {
+    $("snapshot-add-status").textContent = names.length ? "每個名稱最多 80 個字。" : "請輸入物品名稱。";
+    return;
+  }
+  const request = snapshotRequest;
+  $("snapshot-add-name").value = "";
+  $("snapshot-add-status").textContent = "正在背景儲存 " + names.length + " 件物品…";
+  const jobs = names.map(name => queuePhotoUpload({ level: 4, parent: space.id, name }));
+  await Promise.all(jobs.map(job => job.completion));
+  if (!snapshotDialog.open || snapshotRequest !== request) return;
+  const failed = jobs.filter(job => job.failed).length;
+  $("snapshot-add-status").textContent = failed
+    ? "已加入 " + (jobs.length - failed) + " 件，有 " + failed + " 件需回清單重試。"
+    : "已加入 " + jobs.length + " 件物品。";
+};
 $("snapshot-edit").onclick = () => {
   const record = snapshotRecords[snapshotIndex];
   const item = record?.level === 4 && entries.find(entry => entry.id === record.id);
@@ -448,7 +484,7 @@ async function renderSnapshots(query, generation) {
         const files = await drive.spacePhotos(space.id);
         if (generation !== snapshotGeneration) return;
         const photos = files.map(file => ({
-          id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true, location: space.location
+          id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true, location: space.location, spaceId: space.id
         }));
         records.push(...photos);
         grid.append(...photos.map(photo => snapshotTile(photo, groups)));
@@ -839,6 +875,10 @@ function batchSpacePosition(record, parent, index, total) {
   return { photoX, photoY };
 }
 
+function splitItemNames(value) {
+  return value.split(/[\s,，、]+/u).filter(Boolean);
+}
+
 $("form").onsubmit = async event => {
   event.preventDefault();
   if ($("save").disabled || !draft || draft.level === 0) return;
@@ -850,7 +890,7 @@ $("form").onsubmit = async event => {
   }
   let name = photoOnly ? "" : $("name").value.trim();
   const enteredName = name;
-  const names = draft.id ? [] : name.split(draft.level === 4 ? /[\s,，、]+/u : /\s+/u).filter(Boolean);
+  const names = draft.id ? [] : draft.level === 4 ? splitItemNames(name) : name.split(/\s+/u).filter(Boolean);
   if (!draft.id) name = names[0] || "";
   if (!name && draft.level === 4 && (photos.length || draft.editedCover || (draft.hasPhoto && !draft.photoRemoved))) name = "物品照片 " + formatTime(new Date().toISOString());
   if (!name) {

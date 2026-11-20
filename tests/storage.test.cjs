@@ -477,6 +477,13 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(get('snapshot-image').hidden, true);
   assert.equal(get('snapshot-status').textContent, '這件物品沒有照片');
   assert.equal(get('snapshot-edit').hidden, false);
+  get('snapshot-add').onclick();
+  assert.equal(get('snapshot-add-form').hidden, false);
+  get('snapshot-add-name').value = '黑胡椒醬  醋　龍眼';
+  await get('snapshot-add-form').onsubmit({ preventDefault() {} });
+  for (const name of ['黑胡椒醬', '醋', '龍眼']) assert.ok(records.some(record => record.name === name && record.parent === 'left'));
+  assert.equal(get('snapshot-dialog').open, true);
+  assert.equal(get('snapshot-add-status').textContent, '已加入 3 件物品。');
   get('snapshot-close').onclick();
   get('add').onclick();
   const kinds = get('add-kind').children;

@@ -6,21 +6,21 @@
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>收納管家</title>
-  <link rel="icon" href="icon.svg?v=60" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest?v=60">
-  <link rel="stylesheet" href="app.css?v=60">
+  <link rel="icon" href="icon.svg?v=61" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest?v=61">
+  <link rel="stylesheet" href="app.css?v=61">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
-  <script src="drive.js?v=60" defer></script>
-  <script src="appearance.js?v=60" defer></script>
-  <script src="photo.js?v=60" defer></script>
-  <script src="plan.js?v=60" defer></script>
-  <script src="export.js?v=60" defer></script>
-  <script src="app.js?v=60" defer></script>
+  <script src="drive.js?v=61" defer></script>
+  <script src="appearance.js?v=61" defer></script>
+  <script src="photo.js?v=61" defer></script>
+  <script src="plan.js?v=61" defer></script>
+  <script src="export.js?v=61" defer></script>
+  <script src="app.js?v=61" defer></script>
 </head>
 <body>
   <header class="brand">
-    <img src="icon.svg?v=60" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
+    <img src="icon.svg?v=61" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
       <p id="drive-quota" class="page-version" role="status"></p>
       <button id="retry-quota" class="quiet" hidden>重試讀取容量</button></div>
     <section id="header-storage" class="header-storage" hidden aria-label="收納與雲端容量">
@@ -51,15 +51,15 @@
     </div>
     <button id="login" class="primary">使用 Google 帳號登入</button>
     <p id="login-status" role="status"></p>
-    <img class="login-photo" src="assets/family.png?v=60" alt="家人在海邊的合照">
+    <img class="login-photo" src="assets/family.png?v=61" alt="家人在海邊的合照">
   </section>
   <main hidden>
     <section id="floor-plans" class="floor-plans" aria-labelledby="floor-heading">
       <h2 id="floor-heading" hidden>四層透天平面圖</h2>
       <div id="floor-tabs" class="floor-tabs" aria-label="選擇樓層"></div>
       <div id="marker-tools" class="marker-tools" role="region" aria-label="調整收納圖示" aria-live="polite" hidden></div>
-      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=60" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
-      <a class="plan-original" href="assets/floor-plans.png?v=60" target="_blank" rel="noopener">查看完整平面圖</a>
+      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans.png?v=61" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
+      <a class="plan-original" href="assets/floor-plans.png?v=61" target="_blank" rel="noopener">查看完整平面圖</a>
     </section>
     <div class="path-toolbar">
       <nav id="path" aria-label="收納位置"></nav>
@@ -94,9 +94,14 @@
     </div>
     <div class="snapshot-navigation">
       <button id="snapshot-previous" type="button" class="quiet" aria-label="上一張">‹</button>
-      <div class="snapshot-navigation-center"><span id="snapshot-count" aria-live="polite"></span><button id="snapshot-edit" type="button" class="quiet" hidden>編輯物品</button></div>
+      <div class="snapshot-navigation-center"><button id="snapshot-add" type="button" class="quiet" aria-controls="snapshot-add-form" aria-expanded="false" hidden>＋ 加入物品</button><span id="snapshot-count" aria-live="polite"></span><button id="snapshot-edit" type="button" class="quiet" hidden>編輯物品</button></div>
       <button id="snapshot-next" type="button" class="quiet" aria-label="下一張">›</button>
     </div>
+    <form id="snapshot-add-form" hidden>
+      <label class="field">物品名稱<input id="snapshot-add-name" maxlength="1000" required placeholder="例如 黑胡椒醬 醋 龍眼"></label>
+      <button type="submit" class="primary">加入</button>
+    </form>
+    <p id="snapshot-add-status" class="muted" role="status"></p>
   </dialog>
   <dialog id="marker-settings-dialog" aria-labelledby="marker-settings-title">
     <form id="marker-settings-form">

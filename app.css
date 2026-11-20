@@ -197,7 +197,7 @@ footer { z-index: 20; }
 .snapshot-navigation { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }
 .snapshot-navigation button { min-width: 44px; font-size: 1.35rem; }
 .snapshot-navigation-center { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 8px; }
-#snapshot-add, #snapshot-edit, #snapshot-recognize { font-size: .85rem; }
+#snapshot-add, #snapshot-edit { font-size: .85rem; }
 .alignment-icon { display: block; width: 70%; height: 70%; margin: auto; }
 #snapshot-add-form { display: flex; align-items: flex-end; gap: 8px; }
 #snapshot-add-form .field { flex: 1; min-width: 0; margin: 0; }

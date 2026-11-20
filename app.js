@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 69;
+const PAGE_BUILD = 70;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -330,10 +330,6 @@ let snapshotUrl;
 let snapshotRecords = [];
 let snapshotIndex = 0;
 let snapshotGesture;
-const geminiProjectKey = "jasonbox-gemini-project";
-try { $("gemini-project").value = localStorage.getItem(geminiProjectKey) || ""; } catch {}
-let recognitionBusy = false;
-let recognitionSuggestions = [];
 const snapshotDialog = $("snapshot-dialog");
 const snapshotStage = $("snapshot-stage");
 $("snapshot-close").onclick = () => snapshotDialog.close();
@@ -364,12 +360,6 @@ async function showSnapshot() {
   $("snapshot-add").setAttribute("aria-expanded", "false");
   $("snapshot-add-name").value = "";
   $("snapshot-add-status").textContent = "";
-  recognitionSuggestions = [];
-  $("snapshot-recognition-status").textContent = "";
-  $("snapshot-use-suggestions").hidden = true;
-  $("snapshot-recognize").hidden = !record.hasPhoto && !record.photo;
-  $("gemini-settings").hidden = $("snapshot-recognize").hidden;
-  $("snapshot-recognize").disabled = true;
   const request = ++snapshotRequest;
   if (!record.hasPhoto && !record.photo) {
     $("snapshot-status").textContent = "這件物品沒有照片";
@@ -383,7 +373,6 @@ async function showSnapshot() {
     $("snapshot-image").src = snapshotUrl;
     $("snapshot-image").alt = record.name;
     $("snapshot-image").hidden = false;
-    $("snapshot-recognize").disabled = recognitionBusy;
     $("snapshot-status").textContent = "";
   } catch {
     if (snapshotDialog.open && request === snapshotRequest) $("snapshot-status").textContent = "無法載入照片，請關閉後重試。";
@@ -407,61 +396,6 @@ $("snapshot-add").onclick = () => {
   form.hidden = !form.hidden;
   $("snapshot-add").setAttribute("aria-expanded", String(!form.hidden));
   if (!form.hidden) $("snapshot-add-name").focus();
-};
-
-async function recognizeSnapshot(image, project, request) {
-  const owner = drive.account()?.email;
-  if (!owner) throw new Error("請先登入收納管家。");
-  const token = await gemini.authorize(window.GOOGLE_CONFIG, owner);
-  await image.decode();
-  if (!snapshotDialog.open || request !== snapshotRequest) return [];
-  const scale = Math.min(1, 1200 / Math.max(image.naturalWidth, image.naturalHeight));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-  const jpeg = canvas.toDataURL("image/jpeg", .82).split(",")[1];
-  return gemini.recognize(project, token, jpeg);
-}
-
-$("snapshot-recognize").onclick = async () => {
-  const image = $("snapshot-image");
-  if (recognitionBusy || image.hidden) return;
-  const input = $("gemini-project");
-  const project = input.value.trim();
-  if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project)) {
-    $("gemini-settings").open = true;
-    $("snapshot-recognition-status").textContent = "請填入已啟用 Vertex AI 的 Google Cloud 專案 ID，再按 Gemini 辨識。";
-    input.focus();
-    return;
-  }
-  try { localStorage.setItem(geminiProjectKey, project); } catch {}
-  const request = snapshotRequest;
-  recognitionBusy = true;
-  $("snapshot-recognize").disabled = true;
-  $("snapshot-use-suggestions").hidden = true;
-  $("snapshot-recognition-status").textContent = "正在連線至 Google Gemini…";
-  try {
-    const names = await recognizeSnapshot(image, project, request);
-    if (!snapshotDialog.open || request !== snapshotRequest) return;
-    recognitionSuggestions = [...new Set(names)];
-    $("snapshot-recognition-status").textContent = recognitionSuggestions.length
-      ? "Gemini 辨識建議：" + recognitionSuggestions.join("、") : "Gemini 未辨識到明確的物品，可手動加入名稱。";
-    $("snapshot-use-suggestions").hidden = !recognitionSuggestions.length || !snapshotStorage(snapshotRecords[snapshotIndex]);
-  } catch (error) {
-    if (snapshotDialog.open && request === snapshotRequest) $("snapshot-recognition-status").textContent = error.message;
-  } finally {
-    recognitionBusy = false;
-    $("snapshot-recognize").disabled = $("snapshot-image").hidden;
-  }
-};
-$("snapshot-use-suggestions").onclick = () => {
-  if (!recognitionSuggestions.length || !snapshotStorage(snapshotRecords[snapshotIndex])) return;
-  $("snapshot-add-form").hidden = false;
-  $("snapshot-add").setAttribute("aria-expanded", "true");
-  const input = $("snapshot-add-name");
-  input.value = [...new Set([...splitItemNames(input.value), ...recognitionSuggestions])].join(" ");
-  input.focus();
 };
 
 $("snapshot-add-form").onsubmit = async event => {
@@ -1214,7 +1148,6 @@ function signOut(message = "") {
   if (editor.open) closeEditor();
   if (snapshotDialog.open) snapshotDialog.close();
   thumbnailCache.clear();
-  gemini.clear();
   clearFloorSnapshot();
   floorSnapshotOnly = false;
   pendingSnapshotSpace = undefined;

@@ -470,6 +470,12 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   tiles.find(tile => tile.children[1].textContent === '第一張').onclick();
   assert.equal(get('snapshot-title').textContent, '第一張');
   assert.match(get('snapshot-location').textContent, /^存放位置：.*\/ 床底下 \/ 左$/);
+  run('recognizeSnapshot = async () => ["bottle", "scissors", "person"]');
+  await get('snapshot-recognize').onclick();
+  assert.equal(get('snapshot-recognition-status').textContent, '辨識建議：瓶子、剪刀');
+  get('snapshot-use-suggestions').onclick();
+  assert.equal(get('snapshot-add-name').value, '瓶子 剪刀');
+  assert.ok(!records.some(record => record.name === '瓶子'), 'recognition does not write until the user submits');
   const stage = get('snapshot-stage');
   stage.onpointerdown({ pointerId: 1, button: 0, clientX: 150, clientY: 10 });
   stage.onpointerup({ pointerId: 1, clientX: 50, clientY: 15 });

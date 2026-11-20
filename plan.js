@@ -316,7 +316,7 @@ function renderFloorPlans(query) {
     : [0, floorPlanTop, 1672, floorPlanHeight];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
   const alignmentMarkers = [];
-  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=67", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
+  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=68", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     const markerFloor = floorNumber(ancestors(entry)[0]?.name || "");
@@ -359,12 +359,18 @@ function renderFloorPlans(query) {
     svg.append(marker);
   }
   host.replaceChildren(svg);
-  const align = button("⊞", planAlignment ? "floor-tab selected" : "floor-tab", () => {
+  const align = button("", planAlignment ? "floor-tab selected" : "floor-tab", () => {
     planAdjustment = null;
     planAlignment = planAlignment ? null : new Set();
     render();
     $("floor-tabs").lastElementChild?.focus();
   });
+  const alignIcon = svgNode("svg", { viewBox: "0 0 24 24", class: "alignment-icon", "aria-hidden": "true" });
+  alignIcon.append(svgNode("path", {
+    d: "M2 8V2h6m8 0h6v6m0 8v6h-6m-8 0H2v-6M7 7h10M7 12h7M7 17h10",
+    fill: "none", stroke: "currentColor", "stroke-width": 1.8, "stroke-linecap": "round", "stroke-linejoin": "round"
+  }));
+  align.append(alignIcon);
   align.setAttribute("aria-label", "對齊");
   align.title = "對齊";
   align.setAttribute("aria-pressed", String(Boolean(planAlignment)));

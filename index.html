@@ -6,32 +6,38 @@
   <meta name="theme-color" content="#f7f5ee">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>收納管家</title>
-  <link rel="icon" href="icon.svg?v=67" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest?v=67">
-  <link rel="stylesheet" href="app.css?v=67">
+  <link rel="icon" href="icon.svg?v=68" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest?v=68">
+  <link rel="stylesheet" href="app.css?v=68">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="https://schmidtaiwan.github.io/JasonHome/google_config.js" defer></script>
-  <script src="drive.js?v=67" defer></script>
-  <script src="appearance.js?v=67" defer></script>
-  <script src="floor-cache.js?v=67" defer></script>
-  <script src="photo.js?v=67" defer></script>
-  <script src="plan.js?v=67" defer></script>
-  <script src="export.js?v=67" defer></script>
-  <script src="app.js?v=67" defer></script>
+  <script src="drive.js?v=68" defer></script>
+  <script src="appearance.js?v=68" defer></script>
+  <script src="floor-cache.js?v=68" defer></script>
+  <script src="photo.js?v=68" defer></script>
+  <script src="plan.js?v=68" defer></script>
+  <script src="export.js?v=68" defer></script>
+  <script src="app.js?v=68" defer></script>
 </head>
 <body>
   <header class="brand">
-    <img src="icon.svg?v=67" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
+    <img src="icon.svg?v=68" alt=""><div class="brand-name"><strong>收納管家</strong><p id="page-version" class="page-version"></p>
       <p id="drive-quota" class="page-version" role="status"></p>
       <button id="retry-quota" class="quiet" hidden>重試讀取容量</button></div>
     <section id="header-storage" class="header-storage" hidden aria-label="收納與雲端容量">
       <h1 id="page-title">我的收納</h1><p id="summary"></p>
     </section>
-    <button id="export-pdf" type="button" aria-label="匯出 PDF" title="匯出 PDF" hidden>
+    <details id="export-menu" hidden>
+      <summary aria-label="匯出與平面圖" title="匯出與平面圖">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/>
       </svg>
-    </button>
+      </summary>
+      <div class="account-panel export-panel">
+        <button id="export-pdf" type="button" class="quiet">匯出 PDF</button>
+        <a href="assets/floor-plans-v63.svg?v=68" target="_blank" rel="noopener">查看完整平面圖</a>
+      </div>
+    </details>
     <button id="marker-settings" type="button" aria-label="圖示設定" title="圖示設定" hidden>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9.5 3h5l.6 2.6 1.7 1 2.6-.8 2.5 4.4-2 1.8v2l2 1.8-2.5 4.4-2.6-.8-1.7 1-.6 2.6h-5l-.6-2.6-1.7-1-2.6.8-2.5-4.4 2-1.8v-2l-2-1.8 2.5-4.4 2.6.8 1.7-1z" transform="translate(0 -1)"/>
@@ -52,7 +58,7 @@
     </div>
     <button id="login" class="primary">使用 Google 帳號登入</button>
     <p id="login-status" role="status"></p>
-    <img class="login-photo" src="assets/family.png?v=67" alt="家人在海邊的合照">
+    <img class="login-photo" src="assets/family.png?v=68" alt="家人在海邊的合照">
   </section>
   <main hidden>
     <section id="floor-plans" class="floor-plans" aria-labelledby="floor-heading">
@@ -60,8 +66,7 @@
       <div id="floor-tabs" class="floor-tabs" aria-label="選擇樓層"></div>
       <div id="marker-tools" class="marker-tools" role="region" aria-label="調整收納圖示" aria-live="polite" hidden></div>
       <div id="alignment-tools" class="marker-tools" role="region" aria-label="對齊收納圖示" hidden></div>
-      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans-v63.svg?v=67" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
-      <a class="plan-original" href="assets/floor-plans-v63.svg?v=67" target="_blank" rel="noopener">查看完整平面圖</a>
+      <div id="floor-image" class="floor-image" role="img" aria-label="四層樓平面圖"><img src="assets/floor-plans-v63.svg?v=68" alt="四層透天配置示意圖，一樓含大車庫；未依實際尺寸繪製"></div>
     </section>
     <div class="path-toolbar">
       <nav id="path" aria-label="收納位置"></nav>
@@ -96,9 +101,11 @@
     </div>
     <div class="snapshot-navigation">
       <button id="snapshot-previous" type="button" class="quiet" aria-label="上一張">‹</button>
-      <div class="snapshot-navigation-center"><button id="snapshot-add" type="button" class="quiet" aria-controls="snapshot-add-form" aria-expanded="false" hidden>＋ 加入物品</button><span id="snapshot-count" aria-live="polite"></span><button id="snapshot-edit" type="button" class="quiet" hidden>編輯物品</button></div>
+      <div class="snapshot-navigation-center"><button id="snapshot-recognize" type="button" class="quiet" hidden>辨識物品</button><button id="snapshot-add" type="button" class="quiet" aria-controls="snapshot-add-form" aria-expanded="false" hidden>＋ 加入物品</button><span id="snapshot-count" aria-live="polite"></span><button id="snapshot-edit" type="button" class="quiet" hidden>編輯物品</button></div>
       <button id="snapshot-next" type="button" class="quiet" aria-label="下一張">›</button>
     </div>
+    <p id="snapshot-recognition-status" class="muted" role="status"></p>
+    <button id="snapshot-use-suggestions" type="button" class="quiet" hidden>將建議填入名稱</button>
     <form id="snapshot-add-form" hidden>
       <label class="field">物品名稱<input id="snapshot-add-name" maxlength="1000" required placeholder="例如 黑胡椒醬 醋 龍眼"></label>
       <button type="submit" class="primary">加入</button>

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 67;
+const PAGE_BUILD = 68;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -330,6 +330,9 @@ let snapshotUrl;
 let snapshotRecords = [];
 let snapshotIndex = 0;
 let snapshotGesture;
+let recognitionWorker;
+let recognitionBusy = false;
+let recognitionSuggestions = [];
 const snapshotDialog = $("snapshot-dialog");
 const snapshotStage = $("snapshot-stage");
 $("snapshot-close").onclick = () => snapshotDialog.close();
@@ -360,6 +363,11 @@ async function showSnapshot() {
   $("snapshot-add").setAttribute("aria-expanded", "false");
   $("snapshot-add-name").value = "";
   $("snapshot-add-status").textContent = "";
+  recognitionSuggestions = [];
+  $("snapshot-recognition-status").textContent = "";
+  $("snapshot-use-suggestions").hidden = true;
+  $("snapshot-recognize").hidden = !record.hasPhoto && !record.photo;
+  $("snapshot-recognize").disabled = true;
   const request = ++snapshotRequest;
   if (!record.hasPhoto && !record.photo) {
     $("snapshot-status").textContent = "這件物品沒有照片";
@@ -373,6 +381,7 @@ async function showSnapshot() {
     $("snapshot-image").src = snapshotUrl;
     $("snapshot-image").alt = record.name;
     $("snapshot-image").hidden = false;
+    $("snapshot-recognize").disabled = recognitionBusy;
     $("snapshot-status").textContent = "";
   } catch {
     if (snapshotDialog.open && request === snapshotRequest) $("snapshot-status").textContent = "無法載入照片，請關閉後重試。";
@@ -397,6 +406,79 @@ $("snapshot-add").onclick = () => {
   $("snapshot-add").setAttribute("aria-expanded", String(!form.hidden));
   if (!form.hidden) $("snapshot-add-name").focus();
 };
+
+const recognizedNames = {
+  backpack: "背包", handbag: "手提包", suitcase: "行李箱", umbrella: "雨傘",
+  bottle: "瓶子", "wine glass": "酒杯", cup: "杯子", fork: "叉子", knife: "刀子", spoon: "湯匙", bowl: "碗",
+  banana: "香蕉", apple: "蘋果", orange: "橘子", broccoli: "花椰菜", carrot: "紅蘿蔔",
+  chair: "椅子", couch: "沙發", "potted plant": "盆栽", bed: "床", "dining table": "餐桌", toilet: "馬桶",
+  tv: "電視", laptop: "筆電", mouse: "滑鼠", remote: "遙控器", keyboard: "鍵盤", "cell phone": "手機",
+  microwave: "微波爐", oven: "烤箱", toaster: "烤麵包機", sink: "水槽", refrigerator: "冰箱",
+  book: "書本", clock: "時鐘", vase: "花瓶", scissors: "剪刀", "teddy bear": "玩具熊",
+  "hair drier": "吹風機", toothbrush: "牙刷", "sports ball": "球", "tennis racket": "網球拍"
+};
+
+async function recognizeSnapshot(image) {
+  await image.decode();
+  const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const { data: pixels } = context.getImageData(0, 0, canvas.width, canvas.height);
+  recognitionWorker ||= new Worker("recognition-worker.js?v=" + PAGE_BUILD);
+  const worker = recognitionWorker;
+  return new Promise((resolve, reject) => {
+    const fail = () => {
+      clearTimeout(timeout);
+      worker.terminate();
+      recognitionWorker = undefined;
+      reject(new Error("照片辨識未完成"));
+    };
+    const timeout = setTimeout(fail, 45000);
+    worker.onerror = fail;
+    worker.onmessage = ({ data }) => {
+      if (!Array.isArray(data?.names)) return fail();
+      clearTimeout(timeout);
+      resolve(data.names);
+    };
+    worker.postMessage({ pixels, width: canvas.width, height: canvas.height }, [pixels.buffer]);
+  });
+}
+
+$("snapshot-recognize").onclick = async () => {
+  const image = $("snapshot-image");
+  if (recognitionBusy || image.hidden) return;
+  const request = snapshotRequest;
+  recognitionBusy = true;
+  $("snapshot-recognize").disabled = true;
+  $("snapshot-use-suggestions").hidden = true;
+  $("snapshot-recognition-status").textContent = "正在辨識，第一次會先下載模型…";
+  try {
+    const names = await recognizeSnapshot(image);
+    if (!snapshotDialog.open || request !== snapshotRequest) return;
+    recognitionSuggestions = names.filter(name => typeof name === "string" && name !== "person")
+      .map(name => Object.hasOwn(recognizedNames, name) ? recognizedNames[name] : name.replaceAll(" ", "-"));
+    $("snapshot-recognition-status").textContent = recognitionSuggestions.length
+      ? "辨識建議：" + recognitionSuggestions.join("、") : "未辨識到支援的物品，可手動加入名稱。";
+    $("snapshot-use-suggestions").hidden = !recognitionSuggestions.length || !snapshotStorage(snapshotRecords[snapshotIndex]);
+  } catch {
+    if (snapshotDialog.open && request === snapshotRequest) $("snapshot-recognition-status").textContent = "辨識未完成，請重試或手動加入物品。";
+  } finally {
+    recognitionBusy = false;
+    $("snapshot-recognize").disabled = $("snapshot-image").hidden;
+  }
+};
+$("snapshot-use-suggestions").onclick = () => {
+  if (!recognitionSuggestions.length || !snapshotStorage(snapshotRecords[snapshotIndex])) return;
+  $("snapshot-add-form").hidden = false;
+  $("snapshot-add").setAttribute("aria-expanded", "true");
+  const input = $("snapshot-add-name");
+  input.value = [...new Set([...splitItemNames(input.value), ...recognitionSuggestions])].join(" ");
+  input.focus();
+};
+
 $("snapshot-add-form").onsubmit = async event => {
   event.preventDefault();
   const space = snapshotStorage(snapshotRecords[snapshotIndex]);
@@ -1077,7 +1159,8 @@ async function refreshQuota() {
 function setSignedIn(value) {
   signedIn = value;
   $("marker-settings").hidden = !signedIn;
-  $("export-pdf").hidden = !signedIn;
+  $("export-menu").hidden = !signedIn;
+  $("export-menu").open = false;
   $("export-pdf").disabled = floorSnapshotOnly;
   document.querySelector("main").hidden = !signedIn;
   document.querySelector("footer").hidden = !signedIn;
@@ -1231,4 +1314,7 @@ if (window.location.protocol === "file:") {
   $("login-status").append("請先執行 preview.cmd，再開啟 ", link, " 以登入 Google。");
 }
 
-$("export-pdf").onclick = exportPdf;
+$("export-pdf").onclick = () => {
+  $("export-menu").open = false;
+  void exportPdf();
+};

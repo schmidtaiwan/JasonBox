@@ -25,16 +25,20 @@ button:disabled { cursor: wait; opacity: .55; }
 .header-storage p { font-size: .8rem; line-height: 1.6; color: var(--muted); }
 .header-storage #retry-quota { padding: 0; min-height: 32px; font-size: .8rem; }
 .account-menu { position: relative; margin-left: auto; align-self: flex-start; margin-top: 16px; }
-#marker-settings, #export-pdf { align-self: flex-start; margin-top: 16px; padding: 0; color: var(--green); }
-#export-pdf { margin-left: auto; }
-#export-pdf:not([hidden]) + #marker-settings { margin-left: 0; }
+#marker-settings, #export-menu { align-self: flex-start; margin-top: 16px; padding: 0; color: var(--green); }
+#export-menu { position: relative; margin-left: auto; }
+#export-menu:not([hidden]) + #marker-settings { margin-left: 0; }
 #marker-settings:not([hidden]) + .account-menu { margin-left: 0; }
 .marker-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .marker-toggle input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--green); }
 #marker-label-options { min-width: 0; border: 1px solid var(--line); border-radius: 10px; }
 .space-photo-label.label-above { grid-row: 1; }
 .space-photo-label.custom-label { background: #fff; border-color: currentColor; }
-#export-pdf, #marker-settings, .account-menu > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #e1ead8; border: 2px solid #b6c9ba; }
+#export-menu > summary, #marker-settings, .account-menu > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #e1ead8; border: 2px solid #b6c9ba; }
+#export-menu > summary { list-style: none; cursor: pointer; }
+#export-menu > summary::-webkit-details-marker { display: none; }
+.export-panel { display: grid; gap: 4px; padding: 6px 12px; }
+.export-panel button, .export-panel a { min-height: 44px; display: flex; align-items: center; padding: 8px; margin: 0; text-align: left; color: var(--green); }
 .account-menu > summary { list-style: none; cursor: pointer; }
 .account-menu > summary::-webkit-details-marker { display: none; }
 .account-menu img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
@@ -108,7 +112,6 @@ dialog::backdrop { background: #172c20a0; }
 .floor-image.floor-2 img { left: -129%; }
 .floor-image.floor-3 img { left: -235%; }
 .floor-image.floor-4 img { left: -340%; }
-.plan-original { display: inline-block; padding-block: 12px; color: var(--green); }
 .interactive-plan { width: 100%; overflow: hidden; background: white; }
 .interactive-plan svg { display: block; width: 100%; height: auto; cursor: default; touch-action: manipulation; }
 .interactive-plan.single-plan { max-width: none; margin-inline: 0; }
@@ -194,7 +197,8 @@ footer { z-index: 20; }
 .snapshot-navigation { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }
 .snapshot-navigation button { min-width: 44px; font-size: 1.35rem; }
 .snapshot-navigation-center { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 8px; }
-#snapshot-add, #snapshot-edit { font-size: .85rem; }
+#snapshot-add, #snapshot-edit, #snapshot-recognize { font-size: .85rem; }
+.alignment-icon { display: block; width: 70%; height: 70%; margin: auto; }
 #snapshot-add-form { display: flex; align-items: flex-end; gap: 8px; }
 #snapshot-add-form .field { flex: 1; min-width: 0; margin: 0; }
 #snapshot-add-status:not(:empty) { margin-top: 6px; }

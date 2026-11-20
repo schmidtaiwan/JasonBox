@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 52;
+const PAGE_BUILD = 53;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -314,20 +314,33 @@ function card(entry, searching) {
 let snapshotGeneration = 0;
 let snapshotRequest = 0;
 let snapshotUrl;
+let snapshotRecords = [];
+let snapshotIndex = 0;
+let snapshotGesture;
 const snapshotDialog = $("snapshot-dialog");
+const snapshotStage = $("snapshot-stage");
 $("snapshot-close").onclick = () => snapshotDialog.close();
-snapshotDialog.onclose = () => {
-  snapshotRequest++;
+function clearSnapshotImage() {
   if (snapshotUrl) URL.revokeObjectURL(snapshotUrl);
   snapshotUrl = undefined;
   $("snapshot-image").removeAttribute("src");
+  $("snapshot-image").hidden = true;
+}
+snapshotDialog.onclose = () => {
+  snapshotRequest++;
+  snapshotRecords = [];
+  snapshotGesture = undefined;
+  clearSnapshotImage();
 };
 
-async function openSnapshot(record) {
+async function showSnapshot() {
+  const record = snapshotRecords[snapshotIndex];
+  clearSnapshotImage();
   $("snapshot-title").textContent = record.name;
+  $("snapshot-count").textContent = (snapshotIndex + 1) + " / " + snapshotRecords.length;
+  $("snapshot-previous").disabled = snapshotIndex === 0;
+  $("snapshot-next").disabled = snapshotIndex === snapshotRecords.length - 1;
   $("snapshot-status").textContent = "載入照片…";
-  $("snapshot-image").hidden = true;
-  snapshotDialog.showModal();
   const request = ++snapshotRequest;
   try {
     const blob = record.photo || await loadSnapshotPhoto(record.photoId || record.id, record.updatedAt);
@@ -342,9 +355,45 @@ async function openSnapshot(record) {
   }
 }
 
-function snapshotTile(record, fallback) {
+function stepSnapshot(direction) {
+  const next = snapshotIndex + direction;
+  if (!snapshotDialog.open || next < 0 || next >= snapshotRecords.length) return;
+  snapshotIndex = next;
+  void showSnapshot();
+}
+$("snapshot-previous").onclick = () => stepSnapshot(-1);
+$("snapshot-next").onclick = () => stepSnapshot(1);
+snapshotDialog.onkeydown = event => {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  event.preventDefault();
+  stepSnapshot(event.key === "ArrowLeft" ? -1 : 1);
+};
+snapshotStage.onpointerdown = event => {
+  if (snapshotGesture || event.button !== 0 || event.isPrimary === false) return;
+  snapshotGesture = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  snapshotStage.setPointerCapture(event.pointerId);
+};
+snapshotStage.onpointercancel = event => {
+  if (snapshotGesture?.id === event.pointerId) snapshotGesture = undefined;
+};
+snapshotStage.onlostpointercapture = snapshotStage.onpointercancel;
+snapshotStage.onpointerup = event => {
+  if (snapshotGesture?.id !== event.pointerId) return;
+  const dx = event.clientX - snapshotGesture.x;
+  const dy = event.clientY - snapshotGesture.y;
+  snapshotGesture = undefined;
+  if (Math.abs(dx) >= 44 && Math.abs(dx) > Math.abs(dy) * 1.3) stepSnapshot(dx < 0 ? 1 : -1);
+};
+
+function snapshotTile(record, fallback, groups) {
   const hasPhoto = record.hasPhoto || record.photo;
-  const tile = button("", "snapshot-tile", () => hasPhoto ? openSnapshot(record) : fallback());
+  const tile = button("", "snapshot-tile", () => {
+    if (!hasPhoto) return fallback();
+    snapshotRecords = groups.flat().filter(item => item.hasPhoto || item.photo);
+    snapshotIndex = snapshotRecords.indexOf(record);
+    snapshotDialog.showModal();
+    void showSnapshot();
+  });
   const thumbnail = element("span", hasPhoto ? "載入照片…" : "無照片", "thumb");
   tile.append(thumbnail, element("span", record.name));
   if (hasPhoto) displayThumbnail(thumbnail, record);
@@ -364,23 +413,32 @@ async function renderSnapshots(query, generation) {
   $("list-title").textContent = "照片與物品預覽";
   const items = exportItems().filter(item => !query || item.name.toLocaleLowerCase().includes(query));
   const spaces = exportSpaces().filter(space => !query || space.name.toLocaleLowerCase().includes(query));
+  const groups = [items];
   $("count").textContent = items.length + " 件物品";
-  if (items.length) snapshotGroup("物品").append(...items.map(item => snapshotTile(item, () => openItem(item))));
+  if (items.length) snapshotGroup("物品").append(...items.map(item => snapshotTile(item, () => openItem(item), groups)));
   if (!items.length && !spaces.length) $("list").append(element("p", "沒有符合的照片或物品。", "empty"));
   const albums = [];
   for (const space of spaces) {
     const grid = snapshotGroup(space.location + "｜空間照片");
-    if (space.hasPhoto) grid.append(snapshotTile({ ...space, name: space.name + "・封面" }, () => navigate(space)));
-    if (space.spaceAlbum) albums.push({ space, grid });
+    const records = [];
+    groups.push(records);
+    if (space.hasPhoto) {
+      const cover = { ...space, name: space.name + "・封面" };
+      records.push(cover);
+      grid.append(snapshotTile(cover, () => navigate(space), groups));
+    }
+    if (space.spaceAlbum) albums.push({ space, grid, records });
   }
   for (let offset = 0; offset < albums.length && generation === snapshotGeneration; offset += 4) {
-    await Promise.all(albums.slice(offset, offset + 4).map(async ({ space, grid }) => {
+    await Promise.all(albums.slice(offset, offset + 4).map(async ({ space, grid, records }) => {
       try {
         const files = await drive.spacePhotos(space.id);
         if (generation !== snapshotGeneration) return;
-        grid.append(...files.map(file => snapshotTile({
+        const photos = files.map(file => ({
           id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true
-        }, () => navigate(space))));
+        }));
+        records.push(...photos);
+        grid.append(...photos.map(photo => snapshotTile(photo, () => navigate(space), groups)));
       } catch {
         if (generation === snapshotGeneration) grid.append(element("p", "無法載入空間相簿。", "muted"));
       }
@@ -949,6 +1007,7 @@ async function refreshQuota() {
 function setSignedIn(value) {
   signedIn = value;
   $("marker-settings").hidden = !signedIn;
+  $("export-pdf").hidden = !signedIn;
   document.querySelector("main").hidden = !signedIn;
   document.querySelector("footer").hidden = !signedIn;
   $("gate").hidden = signedIn;

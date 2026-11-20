@@ -457,6 +457,17 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   const itemGrid = get('list').children[0].children[1];
   assert.ok(itemGrid.children.some(tile => tile.children[1].textContent === 'stay'));
   assert.ok(!itemGrid.children.some(tile => tile.children[1].textContent === '層內物品'));
+  run('entries.push({id:"p1",name:"第一張",parent:"left",level:4,photo:new Blob(["one"])},{id:"p2",name:"第二張",parent:"left",level:4,photo:new Blob(["two"])}); render()');
+  const tiles = get('list').children[0].children[1].children;
+  tiles.find(tile => tile.children[1].textContent === '第一張').onclick();
+  assert.equal(get('snapshot-title').textContent, '第一張');
+  const stage = get('snapshot-stage');
+  stage.onpointerdown({ pointerId: 1, button: 0, clientX: 150, clientY: 10 });
+  stage.onpointerup({ pointerId: 1, clientX: 50, clientY: 15 });
+  assert.equal(get('snapshot-title').textContent, '第二張');
+  assert.equal(get('snapshot-count').textContent, '2 / 2');
+  get('snapshot-previous').onclick();
+  assert.equal(get('snapshot-title').textContent, '第一張');
 });
 
 test('Drive round-trips coordinates and timestamps and reads both direct and legacy items', async () => {

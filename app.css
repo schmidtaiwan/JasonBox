@@ -25,14 +25,16 @@ button:disabled { cursor: wait; opacity: .55; }
 .header-storage p { font-size: .8rem; line-height: 1.6; color: var(--muted); }
 .header-storage #retry-quota { padding: 0; min-height: 32px; font-size: .8rem; }
 .account-menu { position: relative; margin-left: auto; align-self: flex-start; margin-top: 16px; }
-#marker-settings { margin-left: auto; align-self: flex-start; margin-top: 16px; padding: 0; color: var(--green); }
+#marker-settings, #export-pdf { align-self: flex-start; margin-top: 16px; padding: 0; color: var(--green); }
+#export-pdf { margin-left: auto; }
+#export-pdf:not([hidden]) + #marker-settings { margin-left: 0; }
 #marker-settings:not([hidden]) + .account-menu { margin-left: 0; }
 .marker-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .marker-toggle input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--green); }
 #marker-label-options { min-width: 0; border: 1px solid var(--line); border-radius: 10px; }
 .space-photo-label.label-above { grid-row: 1; }
 .space-photo-label.custom-label { background: #fff; border-color: currentColor; }
-#marker-settings, .account-menu > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #e1ead8; border: 2px solid #b6c9ba; }
+#export-pdf, #marker-settings, .account-menu > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #e1ead8; border: 2px solid #b6c9ba; }
 .account-menu > summary { list-style: none; cursor: pointer; }
 .account-menu > summary::-webkit-details-marker { display: none; }
 .account-menu img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
@@ -184,7 +186,10 @@ footer { z-index: 20; }
 .snapshot-tile { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #fffefa; padding: 5px; text-align: left; font-size: .85rem; overflow-wrap: anywhere; }
 .snapshot-tile .thumb { width: 100%; height: auto; aspect-ratio: 1; flex: none; object-fit: cover; }
 #snapshot-dialog { max-width: min(680px, 100% - 28px); }
-#snapshot-image { display: block; width: 100%; max-height: 70dvh; object-fit: contain; }
+#snapshot-stage { min-height: 100px; touch-action: pan-y pinch-zoom; user-select: none; }
+#snapshot-image { display: block; width: 100%; max-height: 65dvh; object-fit: contain; }
+.snapshot-navigation { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }
+.snapshot-navigation button { min-width: 44px; font-size: 1.35rem; }
 .space-photo-canvas { position: relative; width: 100%; margin-inline: auto; }
 .space-photo { display: block; width: 100%; height: auto; }
 .space-photo-marker { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; padding: 4px; max-width: 130px; border: 0; background: transparent; font-size: .85rem; font-weight: 700; text-shadow: 0 0 3px white, 0 0 6px white; touch-action: none; }
@@ -198,7 +203,6 @@ footer { z-index: 20; }
 .login-photo { display: block; width: 100%; height: auto; margin-top: 16px; border-radius: 16px; }
 .gate { padding-bottom: 20px; }
 
-.export-button { min-height: 44px; padding: 6px 12px; font-size: .9rem; }
 
 .footer-actions > button { display: grid; place-items: center; }
 .footer-actions svg { width: 24px; height: 24px; pointer-events: none; }

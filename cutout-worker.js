@@ -1,9 +1,11 @@
 import { env, AutoProcessor, SamModel, RawImage, Tensor } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
 
-env.allowLocalModels = false;
+env.allowLocalModels = true;
+env.allowRemoteModels = false;
+env.localModelPath = new URL("./models/", self.location.href).href;
 env.useBrowserCache = true;
 env.backends.onnx.wasm.numThreads = 1;
-const modelId = "Xenova/slimsam-77-uniform";
+const modelId = "slimsam-77-uniform";
 let tools;
 let prepared;
 

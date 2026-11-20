@@ -1,18 +1,27 @@
 import { env, AutoProcessor, SamModel, RawImage, Tensor } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
 
 env.allowLocalModels = false;
+env.useBrowserCache = true;
 env.backends.onnx.wasm.numThreads = 1;
 const modelId = "Xenova/slimsam-77-uniform";
 let tools;
 let prepared;
 
-self.onmessage = async ({ data: { key, pixels, width, height, x, y } }) => {
+function loadCutoutTools() {
+  tools ||= Promise.all([
+    SamModel.from_pretrained(modelId, { quantized: true }),
+    AutoProcessor.from_pretrained(modelId)
+  ]).catch(error => {
+    tools = undefined;
+    throw error;
+  });
+  return tools;
+}
+
+self.onmessage = async ({ data: { type, key, pixels, width, height, x, y } }) => {
   try {
-    tools ||= Promise.all([
-      SamModel.from_pretrained(modelId, { quantized: true }),
-      AutoProcessor.from_pretrained(modelId)
-    ]);
-    const [model, processor] = await tools;
+    const [model, processor] = await loadCutoutTools();
+    if (type === "preload") return;
     if (prepared?.key !== key) {
       const image = new RawImage(pixels, width, height, 4).rgb();
       const inputs = await processor(image);
@@ -42,6 +51,6 @@ self.onmessage = async ({ data: { key, pixels, width, height, x, y } }) => {
     }
     self.postMessage({ empty: true });
   } catch {
-    self.postMessage({ error: true });
+    if (type !== "preload") self.postMessage({ error: true });
   }
 };

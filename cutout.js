@@ -29,9 +29,28 @@ function applyCutoutMask(pixels, mask, width, height) {
 }
 
 let cutoutWorker;
-function detectCutout(key, pixels, width, height, point) {
+function getCutoutWorker() {
   cutoutWorker ||= new Worker("cutout-worker.js?v=" + PAGE_BUILD, { type: "module" });
-  const worker = cutoutWorker;
+  return cutoutWorker;
+}
+
+function preloadCutoutModel() {
+  if (typeof Worker !== "function" || cutoutWorker) return;
+  try {
+    const worker = getCutoutWorker();
+    worker.onerror = () => {
+      worker.terminate();
+      if (cutoutWorker === worker) cutoutWorker = undefined;
+    };
+    worker.postMessage({ type: "preload" });
+  } catch {
+    cutoutWorker?.terminate();
+    cutoutWorker = undefined;
+  }
+}
+
+function detectCutout(key, pixels, width, height, point) {
+  const worker = getCutoutWorker();
   return new Promise((resolve, reject) => {
     const fail = () => {
       clearTimeout(timeout);

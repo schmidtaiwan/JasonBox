@@ -6,7 +6,6 @@ const planBounds = [
   [860, 118, 1182, 822], [1238, 118, 1564, 822]
 ];
 let planAdjustment = null;
-let adjustingSave = false;
 let adjustmentScroll = null;
 
 function lockAdjustmentScroll(locked) {
@@ -41,9 +40,10 @@ document.addEventListener("keydown", event => {
 
 
 function startAdjustment(entry) {
-  if (adjustingSave) return;
+  if (photoUploads.has(entry.id)) return false;
   planAdjustment = { ...entry, scale: 1 };
   renderAdjustmentTools();
+  return true;
 }
 
 function renderAdjustmentTools() {
@@ -51,55 +51,29 @@ function renderAdjustmentTools() {
   const host = $("marker-tools");
   host.hidden = !planAdjustment;
   if (!planAdjustment) { host.replaceChildren(); return; }
-  const label = element("p", "拖曳「" + planAdjustment.name + "」調整位置。");
-  const save = button(adjustingSave ? "儲存中…" : "儲存調整", "primary", saveAdjustment);
+  const label = element("p", "拖曳「" + planAdjustment.name + "」，放開後自動儲存。");
   const cancel = button("取消", "quiet", () => { planAdjustment = null; render(); });
-  for (const control of [save, cancel]) control.disabled = adjustingSave;
-  host.replaceChildren(label, save, cancel);
-}
-
-async function saveAdjustment() {
-  if (!planAdjustment || adjustingSave) return;
-  adjustingSave = true;
-  $("mutation-status").textContent = "";
-  renderAdjustmentTools();
-  try {
-    const saved = await drive.save(planAdjustment);
-    entries = entries.map(entry => entry.id === saved.id ? saved : entry);
-    if (current?.id === saved.id) current = saved;
-    planAdjustment = null;
-    render();
-  } catch (error) {
-    if (error instanceof drive.SessionExpired) {
-      adjustingSave = false;
-      planAdjustment = null;
-      signOut(error.message);
-    }
-    else $("mutation-status").textContent = "調整尚未儲存：" + error.message;
-  } finally {
-    adjustingSave = false;
-    renderAdjustmentTools();
-  }
+  host.replaceChildren(label, cancel);
 }
 
 function attachMarkerGesture(marker, svg, entry) {
   let timer, press, suppressClick = false;
   const clear = () => { clearTimeout(timer); timer = undefined; };
   marker.onpointerdown = event => {
-    if (adjustingSave || (event.button !== undefined && event.button !== 0)) return;
+    if (event.button !== undefined && event.button !== 0) return;
     event.stopPropagation();
     suppressClick = false;
     press = { id: event.pointerId, x: event.clientX, y: event.clientY, dragged: false };
     marker.setPointerCapture(event.pointerId);
     if (planAdjustment?.id === entry.id) return;
     timer = setTimeout(() => {
-      startAdjustment(entry);
+      if (!startAdjustment(entry)) return;
       suppressClick = true;
       marker.classList.add("adjusting");
     }, 1000);
   };
   marker.onpointermove = event => {
-    if (!press || event.pointerId !== press.id || adjustingSave) return;
+    if (!press || event.pointerId !== press.id) return;
     const distance = Math.hypot(event.clientX - press.x, event.clientY - press.y);
     if (planAdjustment?.id !== entry.id) {
       if (distance > 10) { clear(); suppressClick = true; }
@@ -123,12 +97,27 @@ function attachMarkerGesture(marker, svg, entry) {
   };
   marker.onpointerup = event => {
     if (press?.id !== event.pointerId) return;
+    const dragged = press.dragged;
+    press = null;
     clear();
     if (marker.hasPointerCapture(event.pointerId)) marker.releasePointerCapture(event.pointerId);
-    press = null;
+    if (planAdjustment?.id !== entry.id) return;
+    const record = planAdjustment;
+    planAdjustment = null;
+    if (dragged && (record.x !== entry.x || record.y !== entry.y)) queuePhotoUpload(record);
+    else render();
   };
-  marker.onpointercancel = () => { clear(); press = null; suppressClick = true; };
-  marker.onlostpointercapture = () => { clear(); press = null; };
+  const cancelPress = event => {
+    if (press?.id !== event.pointerId) return;
+    clear();
+    press = null;
+    suppressClick = true;
+    if (planAdjustment?.id !== entry.id) return;
+    planAdjustment = null;
+    render();
+  };
+  marker.onpointercancel = cancelPress;
+  marker.onlostpointercapture = cancelPress;
   marker.oncontextmenu = event => event.preventDefault();
   marker.onclick = event => {
     event.stopPropagation();
@@ -137,7 +126,8 @@ function attachMarkerGesture(marker, svg, entry) {
   };
   marker.onkeydown = event => {
     if (event.key === "F2") {
-      event.preventDefault(); event.stopPropagation(); startAdjustment(entry); renderFloorPlans("");
+      event.preventDefault(); event.stopPropagation();
+      if (startAdjustment(entry)) renderFloorPlans("");
     }
   };
 }
@@ -166,7 +156,7 @@ function renderFloorPlans(query) {
   const bounds = number ? planBounds[number - 1] : null;
   const view = bounds ? [bounds[0] - 8, 20, bounds[2] - bounds[0] + 16, 910] : [0, 0, 1672, 941];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
-  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=57", width: 1672, height: 941 }));
+  svg.append(svgNode("image", { href: "assets/floor-plans.png?v=58", width: 1672, height: 941 }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     if (number && floorNumber(ancestors(entry)[0]?.name || "") !== number) continue;

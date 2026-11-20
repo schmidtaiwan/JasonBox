@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 57;
+const PAGE_BUILD = 58;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -138,7 +138,6 @@ function button(content, className, action) {
 }
 
 function navigate(entry, remember = true) {
-  if (adjustingSave) return;
   planAdjustment = null;
   if (remember && current?.id !== entry?.id) navigationHistory.push({ id: current?.id ?? null, x: window.scrollX, y: window.scrollY, query: $("search").value });
   current = entry;
@@ -793,7 +792,6 @@ function newEntryAtCurrent(kind, prior = {}) {
 }
 $("add").onclick = () => newEntryAtCurrent("item");
 $("back").onclick = () => {
-  if (adjustingSave) return;
   const previous = navigationHistory.length ? navigationHistory.pop() : { id: current?.parent, x: 0, y: 0, query: "" };
   navigate(entries.find(entry => entry.id === previous.id) || null, false);
   $("search").value = previous.query || "";

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 71;
+const PAGE_BUILD = 72;
 const PAGE_DATE = "2026-11-20";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -330,6 +330,9 @@ let snapshotUrl;
 let snapshotRecords = [];
 let snapshotIndex = 0;
 let snapshotGesture;
+let snapshotCutout;
+let snapshotCutoutUrl;
+let cutoutBusy = false;
 const snapshotDialog = $("snapshot-dialog");
 const snapshotStage = $("snapshot-stage");
 $("snapshot-close").onclick = () => snapshotDialog.close();
@@ -344,6 +347,7 @@ snapshotDialog.onclose = () => {
   snapshotRecords = [];
   snapshotGesture = undefined;
   clearSnapshotImage();
+  resetSnapshotCutout();
 };
 
 async function showSnapshot() {
@@ -360,6 +364,7 @@ async function showSnapshot() {
   $("snapshot-add").setAttribute("aria-expanded", "false");
   $("snapshot-add-name").value = "";
   $("snapshot-add-status").textContent = "";
+  resetSnapshotCutout();
   const request = ++snapshotRequest;
   if (!record.hasPhoto && !record.photo) {
     $("snapshot-status").textContent = "這件物品沒有照片";
@@ -373,6 +378,7 @@ async function showSnapshot() {
     $("snapshot-image").src = snapshotUrl;
     $("snapshot-image").alt = record.name;
     $("snapshot-image").hidden = false;
+    syncSnapshotCutout();
     $("snapshot-status").textContent = "";
   } catch {
     if (snapshotDialog.open && request === snapshotRequest) $("snapshot-status").textContent = "無法載入照片，請關閉後重試。";
@@ -395,11 +401,64 @@ $("snapshot-add").onclick = () => {
   const form = $("snapshot-add-form");
   form.hidden = !form.hidden;
   $("snapshot-add").setAttribute("aria-expanded", String(!form.hidden));
+  syncSnapshotCutout();
   if (!form.hidden) $("snapshot-add-name").focus();
 };
 
+function syncSnapshotCutout() {
+  const active = !$("snapshot-add-form").hidden && !$("snapshot-image").hidden;
+  $("snapshot-cutout").hidden = !active;
+  if (active) snapshotStage.classList.add("cutout-active");
+  else snapshotStage.classList.remove("cutout-active");
+}
+
+function resetSnapshotCutout() {
+  if (snapshotCutoutUrl) URL.revokeObjectURL(snapshotCutoutUrl);
+  snapshotCutoutUrl = undefined;
+  snapshotCutout = undefined;
+  $("snapshot-cutout-image").hidden = true;
+  $("snapshot-cutout-image").removeAttribute("src");
+  $("snapshot-cutout-clear").hidden = true;
+  $("snapshot-cutout-status").textContent = "可點選照片中的物品，擷取輪廓作為物品圖片。";
+  $("snapshot-add-submit").disabled = false;
+  syncSnapshotCutout();
+}
+
+async function captureSnapshotObject(event) {
+  if ($("snapshot-add-form").hidden || $("snapshot-image").hidden || cutoutBusy) return;
+  const image = $("snapshot-image");
+  const point = photoTapPoint(image, event.clientX, event.clientY);
+  if (!point) return;
+  const request = snapshotRequest;
+  resetSnapshotCutout();
+  cutoutBusy = true;
+  $("snapshot-add-submit").disabled = true;
+  $("snapshot-cutout-status").textContent = "正在擷取輪廓，首次使用會先下載模型…";
+  try {
+    const result = await makeObjectCutout(image, point, image.src);
+    if (!snapshotDialog.open || request !== snapshotRequest) return;
+    if (!result) {
+      $("snapshot-cutout-status").textContent = "找不到清楚的輪廓，請改點物品中央。";
+      return;
+    }
+    snapshotCutout = result;
+    snapshotCutoutUrl = URL.createObjectURL(result);
+    $("snapshot-cutout-image").src = snapshotCutoutUrl;
+    $("snapshot-cutout-image").hidden = false;
+    $("snapshot-cutout-clear").hidden = false;
+    $("snapshot-cutout-status").textContent = "已擷取輪廓。請輸入一個物品名稱後加入。";
+  } catch (error) {
+    if (snapshotDialog.open && request === snapshotRequest) $("snapshot-cutout-status").textContent = error.message;
+  } finally {
+    cutoutBusy = false;
+    if (snapshotDialog.open && request === snapshotRequest) $("snapshot-add-submit").disabled = false;
+  }
+}
+$("snapshot-cutout-clear").onclick = resetSnapshotCutout;
+
 $("snapshot-add-form").onsubmit = async event => {
   event.preventDefault();
+  if ($("snapshot-add-submit").disabled) return;
   const space = snapshotStorage(snapshotRecords[snapshotIndex]);
   if (!space) return;
   const names = splitItemNames($("snapshot-add-name").value);
@@ -407,10 +466,16 @@ $("snapshot-add-form").onsubmit = async event => {
     $("snapshot-add-status").textContent = names.length ? "每個名稱最多 80 個字。" : "請輸入物品名稱。";
     return;
   }
+  if (snapshotCutout && names.length !== 1) {
+    $("snapshot-add-status").textContent = "擷取的輪廓只能附到一件物品。若要批次加入，請先移除擷取。";
+    return;
+  }
+  const photo = snapshotCutout;
+  resetSnapshotCutout();
   const request = snapshotRequest;
   $("snapshot-add-name").value = "";
   $("snapshot-add-status").textContent = "正在背景儲存 " + names.length + " 件物品…";
-  const jobs = names.map(name => queuePhotoUpload({ level: 4, parent: space.id, name }));
+  const jobs = names.map(name => queuePhotoUpload({ level: 4, parent: space.id, name, photo }));
   await Promise.all(jobs.map(job => job.completion));
   if (!snapshotDialog.open || snapshotRequest !== request) return;
   const failed = jobs.filter(job => job.failed).length;
@@ -445,6 +510,7 @@ snapshotStage.onpointerup = event => {
   const dy = event.clientY - snapshotGesture.y;
   snapshotGesture = undefined;
   if (Math.abs(dx) >= 44 && Math.abs(dx) > Math.abs(dy) * 1.3) stepSnapshot(dx < 0 ? 1 : -1);
+  else if (Math.hypot(dx, dy) < 8) void captureSnapshotObject(event);
 };
 
 function snapshotTile(record, groups) {

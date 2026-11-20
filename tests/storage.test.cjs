@@ -86,7 +86,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     }
   };
   vm.createContext(context);
-  for (const file of ['appearance.js', 'floor-cache.js', 'photo.js', 'plan.js', 'export.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
+  for (const file of ['appearance.js', 'floor-cache.js', 'photo.js', 'plan.js', 'export.js', 'cutout.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
   assert.ok(run('changeDescription({updatedAt: "2026-11-19T04:00:00Z",updatedBy:"backy2777@example.com"})').endsWith(' · BACKY2777'));
   assert.equal(run('markerTone([255,255,255,255])'), 'dark', 'light photo uses dark markers');
@@ -474,6 +474,16 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   tiles.find(tile => tile.children[1].textContent === '第一張').onclick();
   assert.equal(get('snapshot-title').textContent, '第一張');
   assert.match(get('snapshot-location').textContent, /^存放位置：.*\/ 床底下 \/ 左$/);
+  run('makeObjectCutout = async () => new Blob(["cutout"], {type:"image/png"})');
+  Object.assign(get('snapshot-image'), { naturalWidth: 400, naturalHeight: 300 });
+  get('snapshot-add').onclick();
+  await run('captureSnapshotObject({clientX:100, clientY:100})');
+  assert.equal(get('snapshot-cutout-image').hidden, false);
+  get('snapshot-add-name').value = '電動工具';
+  await get('snapshot-add-form').onsubmit({ preventDefault() {} });
+  assert.equal(records.find(record => record.name === '電動工具').photo.type, 'image/png');
+  assert.equal(run('JSON.stringify(applyCutoutMask(new Uint8ClampedArray(36).fill(255), Uint8Array.from([0,0,0,0,1,1,0,0,0]), 3, 3))'),
+    '{"left":1,"top":1,"width":2,"height":1}');
   const stage = get('snapshot-stage');
   stage.onpointerdown({ pointerId: 1, button: 0, clientX: 150, clientY: 10 });
   stage.onpointerup({ pointerId: 1, clientX: 50, clientY: 15 });
@@ -506,7 +516,7 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   await get('gallery').onchange({ target: { files: ['first.jpg', 'second.jpg'].map(name => Object.assign(new Blob([name]), { name })) } });
   await get('form').onsubmit({ preventDefault() {} });
   await new Promise(resolve => setImmediate(resolve));
-  const uploadedPhotos = records.filter(record => record.parent === 'left' && record.photo);
+  const uploadedPhotos = records.filter(record => record.parent === 'left' && record.photo && /^物品照片 /.test(record.name));
   assert.equal(uploadedPhotos.length, 2);
   assert.ok(uploadedPhotos.every(record => /^物品照片 /.test(record.name)));
   const storedEntries = records.map(record => ({ ...record }));
@@ -665,6 +675,10 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   assert.equal(moved.hasPhoto, true);
   const retried = await run('drive.moveItem(moveOriginal, {id:"cabinet"})');
   assert.equal(retried.parent, 'cabinet');
+  const cutout = await run('drive.save({name:"輪廓物品",parent:"space",level:4,photo:new Blob(["cutout"], {type:"image/png"})})');
+  assert.equal(cutout.hasPhoto, true);
+  assert.equal(cutout.itemPhotoType, 'image/png');
+  assert.equal(files.get(cutout.id).name, '輪廓物品.png');
 
   const quota = await run('drive.quota()');
   assert.equal(quota.usage, '1024');

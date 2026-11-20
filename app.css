@@ -199,8 +199,11 @@ footer { z-index: 20; }
 .snapshot-navigation-center { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 8px; }
 #snapshot-add, #snapshot-edit { font-size: .85rem; }
 .alignment-icon { display: block; width: 70%; height: 70%; margin: auto; }
-#snapshot-add-form { display: flex; align-items: flex-end; gap: 8px; }
-#snapshot-add-form .field { flex: 1; min-width: 0; margin: 0; }
+#snapshot-add-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+#snapshot-add-form .field { min-width: 0; margin: 0; }
+#snapshot-cutout { grid-column: 1 / -1; }
+#snapshot-cutout-image { width: 72px; height: 72px; object-fit: contain; vertical-align: middle; border: 1px solid var(--line); border-radius: 8px; }
+#snapshot-stage.cutout-active img { cursor: crosshair; }
 #snapshot-add-status:not(:empty) { margin-top: 6px; }
 .add-kind-field { border: 0; padding: 0; margin: 18px 0; min-width: 0; }
 .add-kind-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }

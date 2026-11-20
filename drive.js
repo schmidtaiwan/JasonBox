@@ -93,10 +93,10 @@ const drive = (() => {
 
   function entryFromFile(file, level) {
     if (file.appProperties?.jasonBoxItem === "1") level = 4;
-    const hasPhoto = file.mimeType === "image/jpeg" || Boolean(file.appProperties?.spacePhotoId);
+    const hasPhoto = ["image/jpeg", "image/png"].includes(file.mimeType) || Boolean(file.appProperties?.spacePhotoId);
     return {
       id: file.id,
-      name: level === 4 ? file.name.replace(/\.(jpg|json)$/, "") : file.name,
+      name: level === 4 ? file.name.replace(/\.(jpg|png|json)$/i, "") : file.name,
       parent: file.parents[0] === root ? null : file.parents[0],
       level,
       positionType: file.appProperties?.positionType,
@@ -108,6 +108,7 @@ const drive = (() => {
       photoX: file.appProperties?.photoX === undefined ? undefined : Number(file.appProperties.photoX),
       photoY: file.appProperties?.photoY === undefined ? undefined : Number(file.appProperties.photoY),
       hasPhoto,
+      itemPhotoType: level === 4 && hasPhoto ? file.mimeType : undefined,
       createdAt: file.createdTime,
       updatedAt: file.appProperties?.updatedAt || file.modifiedTime,
       updatedBy: file.appProperties?.updatedBy,
@@ -242,10 +243,11 @@ const drive = (() => {
       }
       return saved;
     }
-    const jpeg = Boolean(photo || (hasPhoto && !photoRemoved));
-    metadata.name += jpeg ? ".jpg" : ".json";
+    const withPhoto = Boolean(photo || (hasPhoto && !photoRemoved));
+    const png = withPhoto && (photo?.type === "image/png" || (!photo && record.itemPhotoType === "image/png"));
+    metadata.name += withPhoto ? (png ? ".png" : ".jpg") : ".json";
     metadata.appProperties.jasonBoxItem = "1";
-    const type = jpeg ? "image/jpeg" : "application/json";
+    const type = withPhoto ? (png ? "image/png" : "image/jpeg") : "application/json";
     const content = photo || ((!id || photoRemoved) ? new Blob(["{}"], { type }) : undefined);
     if (content) metadata.mimeType = type;
     return entryFromFile(await write(metadata, id, content, type), level);

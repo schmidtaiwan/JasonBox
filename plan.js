@@ -316,7 +316,7 @@ function renderFloorPlans(query) {
     : [0, floorPlanTop, 1672, floorPlanHeight];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
   const alignmentMarkers = [];
-  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=79", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
+  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=80", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     const markerFloor = floorNumber(ancestors(entry)[0]?.name || "");
@@ -420,8 +420,8 @@ function markerRingTone(sample, x, y, radiusX, radiusY) {
   return markerTone(ring);
 }
 
+let spacePhotoFrame;
 function addResizableSpacePhoto(host, canvas, image, spaceId) {
-  const key = "jasonbox-space-photo-height:" + spaceId;
   const minimum = 120;
   const maximum = 1800;
   const viewport = element("div", "", "space-photo-viewport");
@@ -436,6 +436,7 @@ function addResizableSpacePhoto(host, canvas, image, spaceId) {
   let drag;
   const showFullPhoto = () => {
     height = undefined;
+    spacePhotoFrame = undefined;
     viewport.style.maxHeight = "none";
     viewport.style.height = "";
     canvas.style.minWidth = "";
@@ -449,20 +450,14 @@ function addResizableSpacePhoto(host, canvas, image, spaceId) {
   };
   const resize = value => {
     height = Math.min(maximum, Math.max(minimum, Math.round(value)));
+    spacePhotoFrame = { spaceId, height };
     viewport.style.maxHeight = "none";
     viewport.style.height = height + "px";
     handle.setAttribute("aria-valuenow", String(height));
     fitPhoto();
   };
-  const save = () => {
-    if (!height) return;
-    try { localStorage.setItem(key, String(height)); } catch {}
-  };
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved === "fit") showFullPhoto();
-    else if (Number.isInteger(Number(saved)) && Number(saved) >= minimum && Number(saved) <= maximum) resize(Number(saved));
-  } catch {}
+  if (spacePhotoFrame?.spaceId === spaceId) resize(spacePhotoFrame.height);
+  else showFullPhoto();
   handle.onpointerdown = event => {
     if (drag || event.button !== 0) return;
     drag = { id: event.pointerId, y: event.clientY, height: viewport.getBoundingClientRect().height };
@@ -474,20 +469,15 @@ function addResizableSpacePhoto(host, canvas, image, spaceId) {
   handle.onlostpointercapture = event => {
     if (drag?.id !== event.pointerId) return;
     drag = undefined;
-    save();
   };
   handle.onkeydown = event => {
     if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
     event.preventDefault();
     resize(viewport.getBoundingClientRect().height + (event.key === "ArrowDown" ? 24 : -24));
-    save();
   };
   viewport.append(canvas);
   const controls = element("div", "", "space-photo-frame-controls");
-  controls.append(handle, button("顯示全圖", "quiet", () => {
-    showFullPhoto();
-    try { localStorage.setItem(key, "fit"); } catch {}
-  }));
+  controls.append(handle, button("顯示全圖", "quiet", showFullPhoto));
   host.append(viewport, controls);
   return fitPhoto;
 }

@@ -146,3 +146,15 @@ async function makeHandDrawnCutouts(image, shapes) {
   }
   return photos;
 }
+
+async function cropHandDrawnSource(source, originalUrl) {
+  const url = source.file ? URL.createObjectURL(source.file) : originalUrl;
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return await makeHandDrawnCutouts(image, source.prompts.map(prompt => prompt.shape));
+  } finally {
+    if (source.file) URL.revokeObjectURL(url);
+  }
+}

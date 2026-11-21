@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 88;
+const PAGE_BUILD = 89;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -1089,6 +1089,8 @@ let autoCutoutUrls = [];
 let cutoutPrompts = [];
 let cutoutStroke;
 let drawingCutouts = false;
+let handDrawnSources = [];
+let handDrawnPreviewUrl;
 
 function resetAutomaticCutouts() {
   autoCutoutVersion++;
@@ -1105,6 +1107,14 @@ function resetAutomaticCutouts() {
 }
 
 function stopCutoutSelection() {
+  if (handDrawnPreviewUrl) {
+    URL.revokeObjectURL(handDrawnPreviewUrl);
+    handDrawnPreviewUrl = undefined;
+    $("preview").src = previewUrl;
+  }
+  handDrawnSources = [];
+  $("hand-drawn-files").value = "";
+  $("hand-drawn-sources").hidden = true;
   drawingCutouts = false;
   cutoutPrompts = [];
   cutoutStroke = undefined;
@@ -1128,11 +1138,12 @@ function renderCutoutPoints() {
     ? outline("polygon", prompt.shape)
     : svgNode("circle", { cx: prompt.x * width, cy: prompt.y * height, r: radius })));
   if (cutoutStroke) overlay.append(outline("polyline", cutoutStroke.shape));
-  $("confirm-cutout").disabled = !cutoutPrompts.length || Boolean(cutoutStroke);
+  const total = drawingCutouts ? handDrawnSources.reduce((sum, source) => sum + source.prompts.length, 0) : cutoutPrompts.length;
+  $("confirm-cutout").disabled = !total || Boolean(cutoutStroke);
   $("undo-cutout-point").disabled = !cutoutPrompts.length || Boolean(cutoutStroke);
   const confirmLabel = drawingCutouts ? "確認裁切" : "確認辨識";
   $("confirm-cutout").textContent = confirmLabel;
-  $("auto-cutout-status").textContent = cutoutPrompts.length + "／12。"
+  $("auto-cutout-status").textContent = (drawingCutouts ? total + " 個輪廓，" + handDrawnSources.length + " 張來源照片。" : cutoutPrompts.length + "／12。")
     + (drawingCutouts ? "沿物品外緣畫一圈。" : "點選照片上想擷取的物品。")
     + "完成後按" + confirmLabel + "。";
 }
@@ -1147,7 +1158,7 @@ $("preview").onclick = event => {
 
 $("preview").onpointerdown = event => {
   if ($("cutout-selection").hidden || !drawingCutouts ||
-      event.button !== 0 || cutoutStroke || cutoutPrompts.length >= 12) return;
+      !$("preview").complete || event.button !== 0 || cutoutStroke || cutoutPrompts.length >= 12) return;
   const image = $("preview");
   const point = photoTapPoint(image, event.clientX, event.clientY);
   if (!point) return;
@@ -1185,10 +1196,55 @@ $("undo-cutout-point").onclick = () => {
 };
 $("cancel-cutout").onclick = resetAutomaticCutouts;
 
+function switchHandDrawnSource() {
+  if (!drawingCutouts) return;
+  cutoutStroke = undefined;
+  const source = handDrawnSources[Number($("hand-drawn-source").value)];
+  if (!source) return;
+  cutoutPrompts = source.prompts;
+  if (handDrawnPreviewUrl) URL.revokeObjectURL(handDrawnPreviewUrl);
+  handDrawnPreviewUrl = source.file ? URL.createObjectURL(source.file) : undefined;
+  const image = $("preview");
+  const url = handDrawnPreviewUrl || previewUrl;
+  image.src = url;
+  renderCutoutPoints();
+  image.decode().then(() => {
+    if (drawingCutouts && image.src === url) renderCutoutPoints();
+  }).catch(() => {
+    if (drawingCutouts && image.src === url) $("auto-cutout-status").textContent = "無法開啟這張來源照片，請切換來源。";
+  });
+}
+
+$("hand-drawn-source").onchange = switchHandDrawnSource;
+$("hand-drawn-files").onchange = event => {
+  if (!drawingCutouts) return;
+  const files = Array.from(event.target.files || []);
+  event.target.value = "";
+  if (!files.length) return;
+  const select = $("hand-drawn-source");
+  const first = handDrawnSources.length;
+  for (const file of files) {
+    const option = element("option", (handDrawnSources.length + 1) + " · " + file.name);
+    option.value = String(handDrawnSources.length);
+    select.append(option);
+    handDrawnSources.push({ file, prompts: [] });
+  }
+  select.value = String(first);
+  switchHandDrawnSource();
+};
+
 function startCutoutSelection(draw) {
   if (!draft?.id || draft.level !== 4 || !previewUrl || $("auto-cutout").disabled || $("draw-cutout").disabled) return;
   resetAutomaticCutouts();
   drawingCutouts = draw;
+  if (draw) {
+    handDrawnSources = [{ prompts: cutoutPrompts }];
+    const option = element("option", "1 · 目前照片");
+    option.value = "0";
+    $("hand-drawn-source").replaceChildren(option);
+    $("hand-drawn-source").value = "0";
+    $("hand-drawn-sources").hidden = false;
+  }
   $("auto-cutout").disabled = true;
   $("draw-cutout").disabled = true;
   $("cutout-selection").hidden = false;
@@ -1204,9 +1260,11 @@ $("auto-cutout").onclick = () => startCutoutSelection(false);
 $("draw-cutout").onclick = () => startCutoutSelection(true);
 
 $("confirm-cutout").onclick = async () => {
-  if ($("cutout-selection").hidden || !cutoutPrompts.length || cutoutStroke) return;
+  if ($("cutout-selection").hidden || $("confirm-cutout").disabled) return;
   const prompts = cutoutPrompts;
   const draw = drawingCutouts;
+  const sources = handDrawnSources.filter(source => source.prompts.length);
+  const originalUrl = previewUrl;
   stopCutoutSelection();
   const version = autoCutoutVersion;
   const status = $("auto-cutout-status");
@@ -1215,11 +1273,17 @@ $("confirm-cutout").onclick = async () => {
   status.hidden = false;
   status.textContent = draw ? "正在依手繪輪廓裁切…" : "正在辨識物品輪廓…";
   try {
-    await image.decode();
-    if (version !== autoCutoutVersion) return;
-    const photos = draw
-      ? await makeHandDrawnCutouts(image, prompts.map(prompt => prompt.shape))
-      : await makeSelectedCutouts(image, image.src, prompts);
+    const photos = [];
+    if (draw) {
+      for (const source of sources) {
+        if (version !== autoCutoutVersion) return;
+        photos.push(...await cropHandDrawnSource(source, originalUrl));
+      }
+    } else {
+      await image.decode();
+      if (version !== autoCutoutVersion) return;
+      photos.push(...await makeSelectedCutouts(image, image.src, prompts));
+    }
     if (version !== autoCutoutVersion) return;
     const grid = $("auto-cutout-grid");
     const save = $("save-cutouts");

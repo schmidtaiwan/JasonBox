@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 84;
+const PAGE_BUILD = 85;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -1082,7 +1082,77 @@ async function touchParent(id) {
   }
 }
 
+
+let autoCutoutVersion = 0;
+let autoCutoutPhotos = [];
+let autoCutoutUrls = [];
+
+function resetAutomaticCutouts() {
+  autoCutoutVersion++;
+  for (const url of autoCutoutUrls) URL.revokeObjectURL(url);
+  autoCutoutUrls = [];
+  autoCutoutPhotos = [];
+  $("auto-cutout-grid").replaceChildren();
+  $("auto-cutout-results").hidden = true;
+  $("auto-cutout-status").hidden = true;
+  $("auto-cutout-status").textContent = "";
+  $("auto-cutout").disabled = false;
+}
+
+$("auto-cutout").onclick = async () => {
+  if (!draft?.id || draft.level !== 4 || !previewUrl || $("auto-cutout").disabled) return;
+  resetAutomaticCutouts();
+  const version = autoCutoutVersion;
+  const status = $("auto-cutout-status");
+  const image = $("preview");
+  $("auto-cutout").disabled = true;
+  status.hidden = false;
+  status.textContent = "正在辨識物品輪廓…";
+  try {
+    await image.decode();
+    if (version !== autoCutoutVersion) return;
+    const photos = await makeAutomaticCutouts(image, image.src);
+    if (version !== autoCutoutVersion) return;
+    const grid = $("auto-cutout-grid");
+    const save = $("save-cutouts");
+    autoCutoutPhotos = photos.map((photo, index) => {
+      const label = element("label", "", "auto-cutout-option");
+      const checkbox = element("input", "");
+      checkbox.type = "checkbox";
+      checkbox.checked = true;
+      checkbox.setAttribute("aria-label", "物品輪廓 " + (index + 1));
+      checkbox.onchange = () => { save.disabled = !autoCutoutPhotos.some(candidate => candidate.checkbox.checked); };
+      const preview = element("img", "", "thumb");
+      preview.alt = "";
+      preview.src = URL.createObjectURL(photo);
+      autoCutoutUrls.push(preview.src);
+      label.append(checkbox, preview);
+      grid.append(label);
+      return { photo, checkbox };
+    });
+    save.disabled = !photos.length;
+    $("auto-cutout-results").hidden = !photos.length;
+    status.textContent = photos.length ? "找到 " + photos.length + " 個候選輪廓。" : "未辨識到清楚的物品輪廓。";
+  } catch (error) {
+    if (version === autoCutoutVersion) status.textContent = "辨識失敗：" + error.message;
+  } finally {
+    if (version === autoCutoutVersion) $("auto-cutout").disabled = false;
+  }
+};
+
+$("save-cutouts").onclick = () => {
+  if (!draft?.id || draft.level !== 4) return;
+  const selected = autoCutoutPhotos.filter(candidate => candidate.checkbox.checked);
+  if (!selected.length) return;
+  const parent = draft.parent;
+  const name = "物品照片 " + formatTime(new Date().toISOString());
+  for (const [index, { photo }] of selected.entries()) {
+    queuePhotoUpload({ level: 4, parent, name: name + " " + (index + 1), photo });
+  }
+};
+
 function showPhoto() {
+  resetAutomaticCutouts();
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   for (const url of editorPhotoUrls) URL.revokeObjectURL(url);
   editorPhotoUrls = [];
@@ -1092,6 +1162,7 @@ function showPhoto() {
   previewUrl = blob ? URL.createObjectURL(blob) : undefined;
   $("preview").hidden = !previewUrl;
   $("edit-photo").hidden = !blob;
+  $("auto-cutout").hidden = !blob || !draft?.id || draft.level !== 4;
   $("remove-photo").hidden = !blob && !(draft?.hasPhoto && !draft.photoRemoved);
   if (previewUrl) $("preview").src = previewUrl;
   else $("preview").removeAttribute("src");

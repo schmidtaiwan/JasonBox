@@ -49,7 +49,14 @@ function preloadCutoutModel() {
   }
 }
 
-function detectCutout(key, pixels, width, height, point) {
+let pendingCutout = Promise.resolve();
+function detectCutout(key, pixels, width, height, options) {
+  const request = pendingCutout.then(() => sendCutoutRequest(key, pixels, width, height, options));
+  pendingCutout = request.catch(() => {});
+  return request;
+}
+
+function sendCutoutRequest(key, pixels, width, height, options) {
   const worker = getCutoutWorker();
   return new Promise((resolve, reject) => {
     const fail = () => {
@@ -58,27 +65,29 @@ function detectCutout(key, pixels, width, height, point) {
       cutoutWorker = undefined;
       reject(new Error("無法載入輪廓擷取模型，請稍後再試。"));
     };
-    const timeout = setTimeout(fail, 120000);
+    const timeout = setTimeout(fail, options.type === "automatic" ? 240000 : 120000);
     worker.onerror = fail;
     worker.onmessage = ({ data }) => {
       if (data.error) return fail();
       clearTimeout(timeout);
-      resolve(data.mask || null);
+      resolve(data);
     };
-    try { worker.postMessage({ key, pixels, width, height, ...point }, [pixels.buffer]); }
+    try { worker.postMessage({ key, pixels, width, height, ...options }, [pixels.buffer]); }
     catch { fail(); }
   });
 }
 
-async function makeObjectCutout(image, point, key) {
-  const scale = Math.min(1, 900 / Math.max(image.naturalWidth, image.naturalHeight));
+function cutoutSource(image, maxSize) {
+  const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
   const canvas = document.createElement("canvas");
   const width = canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
   const height = canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
   const context = canvas.getContext("2d");
   context.drawImage(image, 0, 0, width, height);
-  const pixels = context.getImageData(0, 0, width, height);
-  const mask = await detectCutout(key, pixels.data.slice(), width, height, point);
+  return { canvas, context, width, height, pixels: context.getImageData(0, 0, width, height) };
+}
+
+function encodeCutout({ canvas, context, width, height, pixels }, mask) {
   if (!mask || mask.length !== width * height) return null;
   const bounds = applyCutoutMask(pixels.data, mask, width, height);
   if (!bounds) return null;
@@ -88,4 +97,23 @@ async function makeObjectCutout(image, point, key) {
   result.height = bounds.height;
   result.getContext("2d").drawImage(canvas, bounds.left, bounds.top, bounds.width, bounds.height, 0, 0, bounds.width, bounds.height);
   return new Promise(resolve => result.toBlob(resolve, "image/png"));
+}
+
+async function makeObjectCutout(image, point, key) {
+  const source = cutoutSource(image, 900);
+  const { mask } = await detectCutout(key, source.pixels.data.slice(), source.width, source.height, point);
+  return encodeCutout(source, mask);
+}
+
+async function makeAutomaticCutouts(image, key) {
+  const source = cutoutSource(image, 640);
+  const original = source.pixels.data.slice();
+  const { masks } = await detectCutout(key, original.slice(), source.width, source.height, { type: "automatic" });
+  const photos = [];
+  for (const mask of masks) {
+    source.pixels.data.set(original);
+    const photo = await encodeCutout(source, mask);
+    if (photo) photos.push(photo);
+  }
+  return photos;
 }

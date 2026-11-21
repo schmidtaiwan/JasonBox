@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 75;
+const PAGE_BUILD = 76;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -202,6 +202,11 @@ function queuePhotoUpload(record, { preserveMap = false } = {}) {
   const id = record.id || "pending-photo-" + ++uploadSequence;
   const local = { ...record, id, hasPhoto: Boolean(record.photo || (record.hasPhoto && !record.photoRemoved)), updatedAt: new Date().toISOString(), updatedBy: drive.account()?.email,
     createdAt: record.createdAt || new Date().toISOString() };
+  if (record.level < 4) {
+    const previousCount = entries.find(entry => entry.id === id)?.albumPhotoCount || 0;
+    const added = (record.extraPhotos || []).filter(photo => !photo.targetId).length;
+    local.albumPhotoCount = (record.photoRemoved ? 0 : previousCount) + added;
+  }
   const job = { id, record, local, failed: false, running: false, mapRevision: preserveMap ? floorRenderRevision : undefined };
   photoUploads.set(id, job);
   entries = entries.filter(entry => entry.id !== id).concat(local);
@@ -236,6 +241,7 @@ async function sendPhotoUpload(job) {
       }
     }
     const saved = await drive.save(job.record);
+    if (saved.level < 4) saved.albumPhotoCount = job.local.albumPhotoCount;
     entries = entries.filter(entry => entry.id !== job.id).map(entry =>
       entry.parent === job.id ? { ...entry, parent: saved.id } : entry).concat(saved);
     for (const pending of photoUploads.values()) {
@@ -306,8 +312,11 @@ function card(entry, searching) {
   const description = element("span", "");
   description.append(element("strong", entry.name));
   if (searching && path) description.append(element("small", path));
-  else if (!isItem) description.append(element("small",
-    children.filter(child => child.level === 4).length + " 件物品 · " + children.filter(child => child.level !== 4).length + " 個空間"));
+  else if (!isItem && !floorSnapshotOnly) {
+    const items = children.filter(child => child.level === 4);
+    const photoCount = Number(Boolean(entry.hasPhoto)) + (entry.albumPhotoCount || 0) + items.filter(item => item.hasPhoto).length;
+    description.append(element("small", items.length + " 件物品 · " + (children.length - items.length) + " 個空間 · " + photoCount + " 張照片"));
+  }
   const thumb = element("span", entry.positionType || labels[entry.level], "thumb");
   const arrow = element("span", "›");
   arrow.setAttribute("aria-hidden", "true");
@@ -1053,6 +1062,7 @@ async function touchParent(id) {
   if (!parent || parent.level === 0) return;
   try {
     const updated = await drive.touch(parent);
+    updated.albumPhotoCount = parent.albumPhotoCount;
     entries = entries.map(entry => entry.id === id ? updated : entry);
     if (current?.id === id) current = updated;
   } catch {

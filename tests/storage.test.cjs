@@ -567,6 +567,7 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
     ['space', { id: 'space', name: '櫃子', mimeType: folder, parents: ['floor'], appProperties: { x: '.35', y: '.25' } }],
     ['cabinet', { id: 'cabinet', name: '舊櫃子', mimeType: folder, parents: ['space'], appProperties: {} }],
     ['box', { id: 'box', name: '舊分類箱', mimeType: folder, parents: ['cabinet'], appProperties: {} }],
+    ['album', { id: 'album', name: '相簿.jpg', mimeType: 'image/jpeg', parents: ['box'], appProperties: { jasonBoxSpacePhoto: '1' } }],
     ['old', { id: 'old', name: '舊物品.json', mimeType: 'application/json', parents: ['box'], appProperties: { jasonBoxItem: '1' } }],
     ['direct', { id: 'direct', name: '直接物品.jpg', mimeType: 'image/jpeg', parents: ['space'], appProperties: { jasonBoxItem: '1' } }]
   ]);
@@ -596,8 +597,9 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
       const query = parsed.searchParams.get('q');
       const parents = [...query.matchAll(/'([^']+)' in parents/g)].map(match => match[1]);
       return Response.json({ files: [...files.values()].filter(file => !file.trashed && file.parents.some(parent => parents.includes(parent))
-        && (!query.includes('jasonBoxSpacePhoto') || file.appProperties?.jasonBoxSpacePhoto === '1')
-        && (!query.includes('jasonBoxItem') || file.mimeType === folder || file.appProperties?.jasonBoxItem === '1')) });
+        && ((query.includes('jasonBoxSpacePhoto') && file.appProperties?.jasonBoxSpacePhoto === '1')
+          || (query.includes('jasonBoxItem') && (file.mimeType === folder || file.appProperties?.jasonBoxItem === '1'))
+          || (!query.includes('jasonBoxItem') && !query.includes('jasonBoxSpacePhoto')))) });
     }
     return Response.json(files.get(id));
   };
@@ -612,6 +614,8 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   vm.runInContext(source, context);
   const run = code => vm.runInContext(code, context);
   const entries = await run('drive.readEntries()');
+  assert.equal(entries.find(e => e.id === 'box').albumPhotoCount, 1);
+  assert.equal(entries.some(e => e.id === 'album'), false);
   assert.equal(entries.find(e => e.id === 'direct').level, 4);
   assert.equal(entries.find(e => e.id === 'old').level, 4);
   const marker = await run('drive.save({id:"space",name:"床底下",parent:"floor",level:1,x:.36,y:.26,scale:1.5})');

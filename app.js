@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 90;
+const PAGE_BUILD = 91;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -554,11 +554,20 @@ function snapshotGroup(title) {
   return grid;
 }
 
+function sortSnapshots(records) {
+  const field = $("preview-sort").value;
+  if (field !== "createdAt" && field !== "updatedAt") return records;
+  const time = record => Date.parse(record[field]) || 0;
+  return records.sort((a, b) => time(b) - time(a));
+}
+
+$("preview-sort").onchange = render;
+
 async function renderSnapshots(query, generation) {
   $("list").replaceChildren();
   $("list-title").textContent = "照片與物品預覽";
-  const items = exportItems().filter(item => !query || item.name.toLocaleLowerCase().includes(query));
-  const spaces = exportSpaces().filter(space => !query || space.name.toLocaleLowerCase().includes(query));
+  const items = sortSnapshots(exportItems().filter(item => !query || item.name.toLocaleLowerCase().includes(query)));
+  const spaces = sortSnapshots(exportSpaces().filter(space => !query || space.name.toLocaleLowerCase().includes(query)));
   const groups = [items];
   $("count").textContent = items.length + " 件物品";
   if (items.length) snapshotGroup("物品").append(...items.map(item => snapshotTile(item, groups)));
@@ -581,10 +590,11 @@ async function renderSnapshots(query, generation) {
         const files = await drive.spacePhotos(space.id);
         if (generation !== snapshotGeneration) return;
         const photos = files.map(file => ({
-          id: file.id, name: file.name.replace(/\.jpg$/i, ""), updatedAt: file.modifiedTime, hasPhoto: true, location: space.location, spaceId: space.id
+          id: file.id, name: file.name.replace(/\.jpg$/i, ""), createdAt: file.createdTime, updatedAt: file.modifiedTime, hasPhoto: true, location: space.location, spaceId: space.id
         }));
         records.push(...photos);
-        grid.append(...photos.map(photo => snapshotTile(photo, groups)));
+        sortSnapshots(records);
+        grid.replaceChildren(...records.map(photo => snapshotTile(photo, groups)));
       } catch {
         if (generation === snapshotGeneration) grid.append(element("p", "無法載入空間相簿。", "muted"));
       }
@@ -638,6 +648,7 @@ function render() {
   $("delete-items").hidden = !signedIn || Boolean(query) || !movableItems(current).length;
   $("move-items").hidden = $("delete-items").hidden || !moveTargets(current).length;
   $("edit-space").onclick = () => edit(current);
+  $("preview-sort").hidden = displayMode !== "preview";
   if (displayMode === "preview") {
     void renderSnapshots(query, generation);
     return;

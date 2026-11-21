@@ -266,3 +266,6 @@ footer { z-index: 20; }
 
 .named-cutout { display: flex; align-items: center; gap: 8px; width: 100%; }
 .named-cutout input[type="text"] { flex: 1; min-width: 0; }
+
+.list-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#preview-sort { width: auto; padding: 6px; font-size: .85rem; }

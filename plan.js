@@ -316,7 +316,7 @@ function renderFloorPlans(query) {
     : [0, floorPlanTop, 1672, floorPlanHeight];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
   const alignmentMarkers = [];
-  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=82", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
+  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=83", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     const markerFloor = floorNumber(ancestors(entry)[0]?.name || "");
@@ -482,11 +482,20 @@ function addResizableSpacePhoto(host, canvas, image, spaceId) {
   return fitPhoto;
 }
 
+let namesShownInSpace;
 function renderSpaceLayout(query) {
   const generation = ++spaceLayoutGeneration;
   const host = $("space-layout");
   host.replaceChildren();
   host.hidden = Boolean(query) || !current || current.level === 0;
+  const toggle = $("show-space-names");
+  const showNames = Boolean(current && namesShownInSpace === current.id);
+  toggle.hidden = host.hidden || !current.hasPhoto;
+  toggle.setAttribute("aria-pressed", String(showNames));
+  toggle.onclick = () => {
+    namesShownInSpace = showNames ? undefined : current.id;
+    renderSpaceLayout(query);
+  };
   if (host.hidden) return;
   const space = current;
   host.append(element("h2", space.name + "的位置圖"));
@@ -580,9 +589,10 @@ function renderSpaceLayout(query) {
     const marker = button("", "space-photo-marker", () => navigate(position));
     marker.setAttribute("aria-label", "開啟內部位置：" + position.name);
     const iconHost = element("span", "", "space-photo-icon");
-    iconHost.append(spaceIconNode(position));
+    const markerEntry = showNames ? { ...position, markerMode: "name" } : position;
+    iconHost.append(spaceIconNode(markerEntry));
     marker.append(iconHost);
-    if (spaceAppearance(position).photoOnly && !markerSettings.iconsOnly) {
+    if (spaceAppearance(markerEntry).photoOnly && !markerSettings.iconsOnly) {
       const label = element("span", position.name, "space-photo-label");
       label.style.fontSize = .85 * markerSizes[markerSettings.size] + "rem";
       if (markerSettings.position === "above") label.classList.add("label-above");

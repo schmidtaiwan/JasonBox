@@ -288,6 +288,18 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   assert.equal(position.parent, storage.id);
   run('current = {...current, hasPhoto:true, photo:new Blob(["space photo"])}; render()');
   assert.equal(get('space-layout').hidden, false);
+  const namesToggle = get('show-space-names');
+  assert.equal(namesToggle.hidden, false);
+  context.markerPositionId = position.id;
+  run('entries.find(entry => entry.id === markerPositionId).photo = new Blob(["marker"])');
+  namesToggle.onclick();
+  assert.equal(namesToggle.attrs['aria-pressed'], 'true');
+  const nameCanvas = get('space-layout').children.find(node => node.className === 'space-photo-viewport').children[0];
+  const nameMarker = nameCanvas.children.find(node => node.attrs['aria-label'] === '開啟內部位置：上層');
+  assert.equal(nameMarker.children[0].children[0].children.at(-1).textContent, '上層');
+  namesToggle.onclick();
+  assert.equal(namesToggle.attrs['aria-pressed'], 'false');
+  run('delete entries.find(entry => entry.id === markerPositionId).photo; render()');
   const photoViewport = get('space-layout').children.find(node => node.className === 'space-photo-viewport');
   const photoCanvas = photoViewport.children[0];
   const frameControls = get('space-layout').children.find(node => node.className === 'space-photo-frame-controls');

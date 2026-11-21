@@ -105,10 +105,10 @@ async function makeObjectCutout(image, point, key) {
   return encodeCutout(source, mask);
 }
 
-async function makeSelectedCutouts(image, key, points) {
+async function makeSelectedCutouts(image, key, prompts) {
   const source = cutoutSource(image, 640);
   const original = source.pixels.data.slice();
-  const { masks } = await detectCutout(key, original.slice(), source.width, source.height, { type: "selected", points });
+  const { masks } = await detectCutout(key, original.slice(), source.width, source.height, { type: "selected", prompts });
   const photos = [];
   for (const mask of masks) {
     source.pixels.data.set(original);

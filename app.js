@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 86;
+const PAGE_BUILD = 87;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -1086,7 +1086,8 @@ async function touchParent(id) {
 let autoCutoutVersion = 0;
 let autoCutoutPhotos = [];
 let autoCutoutUrls = [];
-let cutoutPoints = [];
+let cutoutPrompts = [];
+let cutoutStroke;
 
 function resetAutomaticCutouts() {
   autoCutoutVersion++;
@@ -1102,12 +1103,13 @@ function resetAutomaticCutouts() {
 }
 
 function stopCutoutSelection() {
-  cutoutPoints = [];
+  cutoutPrompts = [];
+  cutoutStroke = undefined;
   $("cutout-selection").hidden = true;
   $("cutout-points").hidden = true;
   $("cutout-points").setAttribute("hidden", "");
   $("cutout-points").replaceChildren();
-  $("preview").classList.remove("selecting-cutouts");
+  $("preview").classList.remove("selecting-cutouts", "drawing-cutouts");
 }
 
 function renderCutoutPoints() {
@@ -1116,22 +1118,71 @@ function renderCutoutPoints() {
   const { naturalWidth: width, naturalHeight: height } = image;
   overlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
   const radius = Math.max(width, height) * .014;
-  overlay.replaceChildren(...cutoutPoints.map(({ x, y }) => svgNode("circle", { cx: x * width, cy: y * height, r: radius })));
-  $("confirm-cutout").disabled = !cutoutPoints.length;
-  $("undo-cutout-point").disabled = !cutoutPoints.length;
-  $("auto-cutout-status").textContent = cutoutPoints.length + "／12 個選點。請點選照片中的物品後按確認辨識。";
+  const outline = (tag, shape) => svgNode(tag, {
+    points: shape.map(({ x, y }) => (x * width) + "," + (y * height)).join(" ")
+  });
+  overlay.replaceChildren(...cutoutPrompts.map(prompt => prompt.shape
+    ? outline("polygon", prompt.shape)
+    : svgNode("circle", { cx: prompt.x * width, cy: prompt.y * height, r: radius })));
+  if (cutoutStroke) overlay.append(outline("polyline", cutoutStroke.shape));
+  $("confirm-cutout").disabled = !cutoutPrompts.length || Boolean(cutoutStroke);
+  $("undo-cutout-point").disabled = !cutoutPrompts.length || Boolean(cutoutStroke);
+  const drawing = $("cutout-method").value === "shape";
+  $("auto-cutout-status").textContent = cutoutPrompts.length + "／12。"
+    + (drawing ? "用手指沿物品外緣圈出大致輪廓。" : "點選照片上想擷取的物品。")
+    + "完成後按確認辨識。";
 }
 
+$("cutout-method").onchange = () => {
+  cutoutStroke = undefined;
+  $("preview").classList.toggle("drawing-cutouts", $("cutout-method").value === "shape");
+  renderCutoutPoints();
+};
+
 $("preview").onclick = event => {
-  if ($("cutout-selection").hidden || cutoutPoints.length >= 12) return;
+  if ($("cutout-selection").hidden || $("cutout-method").value === "shape" || cutoutPrompts.length >= 12) return;
   const point = photoTapPoint($("preview"), event.clientX, event.clientY);
   if (!point) return;
-  cutoutPoints.push(point);
+  cutoutPrompts.push(point);
+  renderCutoutPoints();
+};
+
+$("preview").onpointerdown = event => {
+  if ($("cutout-selection").hidden || $("cutout-method").value !== "shape" ||
+      event.button !== 0 || cutoutStroke || cutoutPrompts.length >= 12) return;
+  const image = $("preview");
+  const point = photoTapPoint(image, event.clientX, event.clientY);
+  if (!point) return;
+  image.setPointerCapture(event.pointerId);
+  cutoutStroke = { pointerId: event.pointerId, shape: [point] };
+  renderCutoutPoints();
+};
+
+$("preview").onpointermove = event => {
+  if (cutoutStroke?.pointerId !== event.pointerId) return;
+  const point = photoTapPoint($("preview"), event.clientX, event.clientY);
+  const last = cutoutStroke.shape.at(-1);
+  if (!point || Math.hypot(last.x - point.x, last.y - point.y) < .005 || cutoutStroke.shape.length >= 512) return;
+  cutoutStroke.shape.push(point);
+  renderCutoutPoints();
+};
+
+$("preview").onpointerup = event => {
+  if (cutoutStroke?.pointerId !== event.pointerId) return;
+  const { shape } = cutoutStroke;
+  cutoutStroke = undefined;
+  if (shape.length >= 3) cutoutPrompts.push({ shape });
+  renderCutoutPoints();
+};
+
+$("preview").onlostpointercapture = event => {
+  if (cutoutStroke?.pointerId !== event.pointerId) return;
+  cutoutStroke = undefined;
   renderCutoutPoints();
 };
 
 $("undo-cutout-point").onclick = () => {
-  cutoutPoints.pop();
+  cutoutPrompts.pop();
   renderCutoutPoints();
 };
 $("cancel-cutout").onclick = resetAutomaticCutouts;
@@ -1144,13 +1195,14 @@ $("auto-cutout").onclick = () => {
   $("cutout-points").hidden = false;
   $("cutout-points").removeAttribute("hidden");
   $("preview").classList.add("selecting-cutouts");
+  $("cutout-method").value = "point";
   $("auto-cutout-status").hidden = false;
   renderCutoutPoints();
 };
 
 $("confirm-cutout").onclick = async () => {
-  if ($("cutout-selection").hidden || !cutoutPoints.length) return;
-  const points = cutoutPoints;
+  if ($("cutout-selection").hidden || !cutoutPrompts.length || cutoutStroke) return;
+  const prompts = cutoutPrompts;
   stopCutoutSelection();
   const version = autoCutoutVersion;
   const status = $("auto-cutout-status");
@@ -1161,7 +1213,7 @@ $("confirm-cutout").onclick = async () => {
   try {
     await image.decode();
     if (version !== autoCutoutVersion) return;
-    const photos = await makeSelectedCutouts(image, image.src, points);
+    const photos = await makeSelectedCutouts(image, image.src, prompts);
     if (version !== autoCutoutVersion) return;
     const grid = $("auto-cutout-grid");
     const save = $("save-cutouts");

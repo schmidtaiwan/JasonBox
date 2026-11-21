@@ -101,6 +101,7 @@ const drive = (() => {
       parent: file.parents[0] === root ? null : file.parents[0],
       level,
       positionType: file.appProperties?.positionType,
+      markerMode: file.appProperties?.markerMode,
       iconKey: file.appProperties?.iconKey,
       iconColor: file.appProperties?.iconColor,
       photoId: file.appProperties?.spacePhotoId,
@@ -122,28 +123,19 @@ const drive = (() => {
   async function readEntries() {
     let parents = [root];
     const entries = [];
-    const albumCounts = new Map();
     for (let level = 0; level < 5 && parents.length; level++) {
       const next = [];
       for (let offset = 0; offset < parents.length; offset += 30) {
         const group = parents.slice(offset, offset + 30);
         const within = group.map(id => "'" + id + "' in parents").join(" or ");
-        const kind = "(mimeType='" + folder + "' or " + itemFilter + " or " + albumFilter + ")";
+        const kind = "(mimeType='" + folder + "' or " + itemFilter + ")";
         const children = await list("(" + within + ") and " + kind);
         for (const child of children) {
-          if (child.appProperties?.jasonBoxSpacePhoto === "1") {
-            const parent = child.parents[0];
-            albumCounts.set(parent, (albumCounts.get(parent) || 0) + 1);
-            continue;
-          }
           entries.push(entryFromFile(child, level));
           if (child.mimeType === folder) next.push(child.id);
         }
       }
       parents = next;
-    }
-    for (const entry of entries) {
-      if (entry.level < 4) entry.albumPhotoCount = albumCounts.get(entry.id) || 0;
     }
     return entries.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant", { numeric: true }));
   }
@@ -201,6 +193,7 @@ const drive = (() => {
       metadata.parents = [parentId];
     }
     if (level < 4) {
+      if (["photo", "name"].includes(record.markerMode)) metadata.appProperties.markerMode = record.markerMode;
       if (["cabinet", "bed", "box", "shelf", "drawer", "closet", "bag", "home", "photo", "photo-only"].includes(record.iconKey)) metadata.appProperties.iconKey = record.iconKey;
       if (/^#[0-9a-f]{6}$/i.test(record.iconColor || "")) metadata.appProperties.iconColor = record.iconColor;
       if (!id && photo) {

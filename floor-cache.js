@@ -13,8 +13,8 @@ function floorPhotoKey(entry) {
 function floorSnapshotRecords(allEntries) {
   return allEntries.filter(entry => entry.level === 0 ||
     (entry.level === 1 && Number.isFinite(entry.x) && Number.isFinite(entry.y)))
-    .map(({ id, level, parent, name, x, y, hasPhoto, photoId, coverTransform, updatedAt, updatedBy }) =>
-      ({ id, level, parent, name, x, y, hasPhoto, photoId, coverTransform, updatedAt, updatedBy }))
+    .map(({ id, level, parent, name, markerMode, x, y, hasPhoto, photoId, coverTransform, updatedAt, updatedBy }) =>
+      ({ id, level, parent, name, markerMode, x, y, hasPhoto, photoId, coverTransform, updatedAt, updatedBy }))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 

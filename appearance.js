@@ -7,7 +7,7 @@ function spaceAppearance(entry) {
     .map(space => String(space.id)).sort();
   const index = Math.max(0, siblings.indexOf(String(entry.id)));
   const color = spaceColors[index] || generatedSpaceColor(index);
-  return { photoOnly: Boolean(entry.hasPhoto || entry.photo), color };
+  return { photoOnly: entry.markerMode !== "name" && Boolean(entry.hasPhoto || entry.photo), color };
 }
 
 function generatedSpaceColor(index) {

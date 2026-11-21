@@ -544,11 +544,18 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
     const mode = displayMode;
     const cabinet = { id: 'shoes', name: '鞋櫃', level: 1, hasPhoto: true };
     entries = ['left', 'middle', 'right'].map(id => ({ id, parent: cabinet.id, level: 2, hasPhoto: true }));
+    entries.push(
+      { parent: 'left', level: 4, hasPhoto: true, name: '物品照片 2026/11/20 19:07:32 1' },
+      { parent: 'left', level: 4, hasPhoto: true, name: '白鞋' },
+      { parent: cabinet.id, level: 4, hasPhoto: true, name: '物品照片 2026/11/20 19:07:32' },
+      { parent: cabinet.id, level: 4, hasPhoto: true, name: '雨鞋' }
+    );
+    if (spaceAppearance({ ...cabinet, markerMode: 'name' }).photoOnly || !spaceAppearance(cabinet).photoOnly) throw Error('Unexpected marker mode');
     displayMode = 'details';
     try { return card(cabinet, false).children[0].children[1].children[1].textContent; }
     finally { entries = original; displayMode = mode; }
   })()`);
-  assert.equal(photoCount, '0 件物品 · 3 個空間 · 3 張照片');
+  assert.equal(photoCount, '1 件物品 · 3 個空間 · 2 張照片');
   assert.equal(run('current.name'), '2F', 'detail loading preserves the floor selected from the snapshot');
   assert.ok(run('entries.some(entry => entry.level === 4)'));
   const floorId = records.find(record => record.name === '2F').id;
@@ -625,12 +632,12 @@ test('Drive round-trips coordinates and timestamps and reads both direct and leg
   vm.runInContext(source, context);
   const run = code => vm.runInContext(code, context);
   const entries = await run('drive.readEntries()');
-  assert.equal(entries.find(e => e.id === 'box').albumPhotoCount, 1);
   assert.equal(entries.some(e => e.id === 'album'), false);
   assert.equal(entries.find(e => e.id === 'direct').level, 4);
   assert.equal(entries.find(e => e.id === 'old').level, 4);
-  const marker = await run('drive.save({id:"space",name:"床底下",parent:"floor",level:1,x:.36,y:.26,scale:1.5})');
+  const marker = await run('drive.save({id:"space",name:"床底下",parent:"floor",level:1,x:.36,y:.26,scale:1.5,markerMode:"name"})');
   assert.equal(marker.x, .36);
+  assert.equal((await run("drive.readEntries()")).find(entry => entry.id === "space").markerMode, "name");
   assert.equal(marker.y, .26);
   assert.equal(marker.scale, 1.5);
   assert.ok(marker.updatedAt);

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 80;
+const PAGE_BUILD = 81;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -325,7 +325,7 @@ function card(entry, searching) {
     const items = children.filter(child => child.level === 4 && !isUnnamedPhoto(child));
     const spaceCount = children.filter(child => child.level < 4).length;
     const photoCount = containedPhotoCount(children);
-    description.append(element("small", items.length + " 件物品 · " + spaceCount + " 個空間 · " + photoCount + " 張照片"));
+    description.append(element("small", items.length + " 件物品 · " + spaceCount + " 個空間 · " + photoCount + " 張未命名物品照片"));
   }
   const thumb = element("span", entry.positionType || labels[entry.level], "thumb");
   const arrow = element("span", "›");

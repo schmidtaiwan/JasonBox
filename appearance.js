@@ -1,5 +1,4 @@
 "use strict";
-const defaultSpaceIcon = "M-9-8H9V9H-9Z M-9-1H9 M-3-5H3 M-3 4H3";
 const spaceColors = ["#244d38", "#1768a6", "#7544a0", "#b73559", "#b85208", "#8a6500", "#087b7b", "#444444"];
 
 function spaceAppearance(entry) {
@@ -7,8 +6,32 @@ function spaceAppearance(entry) {
   const siblings = entries.filter(space => space.level > 0 && space.level < 4 && space.parent === entry.parent)
     .map(space => String(space.id)).sort();
   const index = Math.max(0, siblings.indexOf(String(entry.id)));
-  const color = spaceColors[index] || "hsl(" + ((index * 137.508) % 360).toFixed(2) + " 62% 35%)";
+  const color = spaceColors[index] || generatedSpaceColor(index);
   return { photoOnly: Boolean(entry.hasPhoto || entry.photo), color };
+}
+
+function generatedSpaceColor(index) {
+  const hue = (index * 137.508) % 360;
+  const channel = offset => {
+    const sector = (offset + hue / 30) % 12;
+    const value = .35 - .62 * .35 * Math.max(-1, Math.min(sector - 3, 9 - sector, 1));
+    return Math.round(value * 255).toString(16).padStart(2, "0");
+  };
+  return "#" + channel(0) + channel(8) + channel(4);
+}
+
+const spaceNameSegments = Intl.Segmenter && new Intl.Segmenter("zh-Hant", { granularity: "grapheme" });
+function spaceMarkerText(entry, color) {
+  const text = svgNode("text", {
+    class: "space-marker-initials", "text-anchor": "middle", "dominant-baseline": "central",
+    "aria-hidden": "true"
+  });
+  const name = entry.name.trim();
+  const characters = spaceNameSegments ? Array.from(spaceNameSegments.segment(name), value => value.segment) : Array.from(name);
+  text.textContent = characters.slice(0, 2).join("");
+  const rgb = color.slice(1).match(/../g).map(channel => parseInt(channel, 16));
+  text.style.fill = markerTone([...rgb, 255]) === "dark" ? "#000" : "#fff";
+  return text;
 }
 
 let photoClipSequence = 0;
@@ -51,7 +74,7 @@ function spaceIconNode(entry) {
     return svg;
   }
   svg.append(svgNode("circle", { r: 22, fill: appearance.color }),
-    svgNode("path", { d: defaultSpaceIcon, fill: "none", stroke: "white", "stroke-width": 2, "stroke-linejoin": "round" }));
+    spaceMarkerText(entry, appearance.color));
   return svg;
 }
 function renderCurrentSpaceIcon() {

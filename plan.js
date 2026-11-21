@@ -316,7 +316,7 @@ function renderFloorPlans(query) {
     : [0, floorPlanTop, 1672, floorPlanHeight];
   const svg = svgNode("svg", { viewBox: view.join(" "), "aria-label": "樓層平面圖", role: "group" });
   const alignmentMarkers = [];
-  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=77", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
+  svg.append(svgNode("image", { href: "assets/floor-plans-v63.svg?v=78", y: floorPlanTop, width: 1672, height: floorPlanHeight }));
   for (const stored of entries.filter(item => item.level !== 4 && Number.isFinite(item.x) && Number.isFinite(item.y))) {
     const entry = stored.id === planAdjustment?.id ? planAdjustment : stored;
     const markerFloor = floorNumber(ancestors(entry)[0]?.name || "");
@@ -332,8 +332,8 @@ function renderFloorPlans(query) {
     if (photoOnly) circle.style.stroke = "none";
     marker.append(circle);
     if (photoOnly) addPhotoThumbnail(marker, entry, 38, color);
-    else marker.append(svgNode("path", { d: defaultSpaceIcon }));
-    if (!markerSettings.iconsOnly) {
+    else marker.append(spaceMarkerText(entry, color));
+    if (photoOnly && !markerSettings.iconsOnly) {
       const size = 17 * markerSizes[markerSettings.size];
       const text = svgNode("text", { y: markerSettings.position === "above" ? -25 : 24 + size * .76, "text-anchor": "middle" });
       text.textContent = entry.name;
@@ -592,7 +592,7 @@ function renderSpaceLayout(query) {
     const iconHost = element("span", "", "space-photo-icon");
     iconHost.append(spaceIconNode(position));
     marker.append(iconHost);
-    if (!markerSettings.iconsOnly) {
+    if (spaceAppearance(position).photoOnly && !markerSettings.iconsOnly) {
       const label = element("span", position.name, "space-photo-label");
       label.style.fontSize = .85 * markerSizes[markerSettings.size] + "rem";
       if (markerSettings.position === "above") label.classList.add("label-above");

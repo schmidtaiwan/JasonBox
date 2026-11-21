@@ -128,8 +128,8 @@ dialog::backdrop { background: #172c20a0; }
 .marker-tools p { margin-bottom: 8px; }
 .marker-tools button { margin-right: 4px; }
 .storage-marker circle { fill: #244d38; stroke: white; stroke-width: 3; }
-.storage-marker path { fill: none; stroke: white; stroke-width: 2; }
 .storage-marker text { fill: #183d2a; font-size: 17px; font-weight: 700; paint-order: stroke; stroke: white; stroke-width: 5px; stroke-linejoin: round; }
+text.space-marker-initials { font-size: 15px; font-weight: 800; stroke: none; }
 .storage-marker.active circle, .storage-marker:focus circle { fill: #b45513; stroke: #ffcf73; stroke-width: 5; }
 .changed-time { font-size: .85rem; }
 #entry-time { line-height: 1.7; }

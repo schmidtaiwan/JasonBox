@@ -117,3 +117,32 @@ async function makeSelectedCutouts(image, key, prompts) {
   }
   return photos;
 }
+
+async function makeHandDrawnCutouts(image, shapes) {
+  const scale = Math.min(1, 1440 / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const photos = [];
+  for (const shape of shapes) {
+    const xs = shape.map(point => point.x * width);
+    const ys = shape.map(point => point.y * height);
+    const left = Math.floor(Math.min(...xs));
+    const top = Math.floor(Math.min(...ys));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(Math.max(...xs)) - left;
+    canvas.height = Math.ceil(Math.max(...ys)) - top;
+    if (canvas.width < 2 || canvas.height < 2) continue;
+    const context = canvas.getContext("2d");
+    context.beginPath();
+    context.moveTo(xs[0] - left, ys[0] - top);
+    for (let i = 1; i < shape.length; i++) context.lineTo(xs[i] - left, ys[i] - top);
+    context.closePath();
+    context.clip("evenodd");
+    context.drawImage(image, -left, -top, width, height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    if (!pixels.some((value, index) => index % 4 === 3 && value > 0)) continue;
+    const photo = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    if (photo) photos.push(photo);
+  }
+  return photos;
+}

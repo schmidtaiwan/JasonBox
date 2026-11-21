@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 87;
+const PAGE_BUILD = 88;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -1088,6 +1088,7 @@ let autoCutoutPhotos = [];
 let autoCutoutUrls = [];
 let cutoutPrompts = [];
 let cutoutStroke;
+let drawingCutouts = false;
 
 function resetAutomaticCutouts() {
   autoCutoutVersion++;
@@ -1100,9 +1101,11 @@ function resetAutomaticCutouts() {
   $("auto-cutout-status").hidden = true;
   $("auto-cutout-status").textContent = "";
   $("auto-cutout").disabled = false;
+  $("draw-cutout").disabled = false;
 }
 
 function stopCutoutSelection() {
+  drawingCutouts = false;
   cutoutPrompts = [];
   cutoutStroke = undefined;
   $("cutout-selection").hidden = true;
@@ -1127,20 +1130,15 @@ function renderCutoutPoints() {
   if (cutoutStroke) overlay.append(outline("polyline", cutoutStroke.shape));
   $("confirm-cutout").disabled = !cutoutPrompts.length || Boolean(cutoutStroke);
   $("undo-cutout-point").disabled = !cutoutPrompts.length || Boolean(cutoutStroke);
-  const drawing = $("cutout-method").value === "shape";
+  const confirmLabel = drawingCutouts ? "確認裁切" : "確認辨識";
+  $("confirm-cutout").textContent = confirmLabel;
   $("auto-cutout-status").textContent = cutoutPrompts.length + "／12。"
-    + (drawing ? "用手指沿物品外緣圈出大致輪廓。" : "點選照片上想擷取的物品。")
-    + "完成後按確認辨識。";
+    + (drawingCutouts ? "沿物品外緣畫一圈。" : "點選照片上想擷取的物品。")
+    + "完成後按" + confirmLabel + "。";
 }
 
-$("cutout-method").onchange = () => {
-  cutoutStroke = undefined;
-  $("preview").classList.toggle("drawing-cutouts", $("cutout-method").value === "shape");
-  renderCutoutPoints();
-};
-
 $("preview").onclick = event => {
-  if ($("cutout-selection").hidden || $("cutout-method").value === "shape" || cutoutPrompts.length >= 12) return;
+  if ($("cutout-selection").hidden || drawingCutouts || cutoutPrompts.length >= 12) return;
   const point = photoTapPoint($("preview"), event.clientX, event.clientY);
   if (!point) return;
   cutoutPrompts.push(point);
@@ -1148,7 +1146,7 @@ $("preview").onclick = event => {
 };
 
 $("preview").onpointerdown = event => {
-  if ($("cutout-selection").hidden || $("cutout-method").value !== "shape" ||
+  if ($("cutout-selection").hidden || !drawingCutouts ||
       event.button !== 0 || cutoutStroke || cutoutPrompts.length >= 12) return;
   const image = $("preview");
   const point = photoTapPoint(image, event.clientX, event.clientY);
@@ -1187,33 +1185,41 @@ $("undo-cutout-point").onclick = () => {
 };
 $("cancel-cutout").onclick = resetAutomaticCutouts;
 
-$("auto-cutout").onclick = () => {
-  if (!draft?.id || draft.level !== 4 || !previewUrl || $("auto-cutout").disabled) return;
+function startCutoutSelection(draw) {
+  if (!draft?.id || draft.level !== 4 || !previewUrl || $("auto-cutout").disabled || $("draw-cutout").disabled) return;
   resetAutomaticCutouts();
+  drawingCutouts = draw;
   $("auto-cutout").disabled = true;
+  $("draw-cutout").disabled = true;
   $("cutout-selection").hidden = false;
   $("cutout-points").hidden = false;
   $("cutout-points").removeAttribute("hidden");
   $("preview").classList.add("selecting-cutouts");
-  $("cutout-method").value = "point";
+  $("preview").classList.toggle("drawing-cutouts", draw);
   $("auto-cutout-status").hidden = false;
   renderCutoutPoints();
-};
+}
+
+$("auto-cutout").onclick = () => startCutoutSelection(false);
+$("draw-cutout").onclick = () => startCutoutSelection(true);
 
 $("confirm-cutout").onclick = async () => {
   if ($("cutout-selection").hidden || !cutoutPrompts.length || cutoutStroke) return;
   const prompts = cutoutPrompts;
+  const draw = drawingCutouts;
   stopCutoutSelection();
   const version = autoCutoutVersion;
   const status = $("auto-cutout-status");
   const image = $("preview");
   $("auto-cutout").disabled = true;
   status.hidden = false;
-  status.textContent = "正在辨識物品輪廓…";
+  status.textContent = draw ? "正在依手繪輪廓裁切…" : "正在辨識物品輪廓…";
   try {
     await image.decode();
     if (version !== autoCutoutVersion) return;
-    const photos = await makeSelectedCutouts(image, image.src, prompts);
+    const photos = draw
+      ? await makeHandDrawnCutouts(image, prompts.map(prompt => prompt.shape))
+      : await makeSelectedCutouts(image, image.src, prompts);
     if (version !== autoCutoutVersion) return;
     const grid = $("auto-cutout-grid");
     const save = $("save-cutouts");
@@ -1234,11 +1240,15 @@ $("confirm-cutout").onclick = async () => {
     });
     save.disabled = !photos.length;
     $("auto-cutout-results").hidden = !photos.length;
-    status.textContent = photos.length ? "找到 " + photos.length + " 個候選輪廓。" : "未辨識到清楚的物品輪廓。";
+    status.textContent = photos.length ? "已擷取 " + photos.length + " 張輪廓照片。"
+      : draw ? "手繪範圍沒有可裁切的內容。" : "未辨識到清楚的物品輪廓。";
   } catch (error) {
-    if (version === autoCutoutVersion) status.textContent = "辨識失敗：" + error.message;
+    if (version === autoCutoutVersion) status.textContent = (draw ? "裁切失敗：" : "辨識失敗：") + error.message;
   } finally {
-    if (version === autoCutoutVersion) $("auto-cutout").disabled = false;
+    if (version === autoCutoutVersion) {
+      $("auto-cutout").disabled = false;
+      $("draw-cutout").disabled = false;
+    }
   }
 };
 
@@ -1265,6 +1275,7 @@ function showPhoto() {
   $("preview").hidden = !previewUrl;
   $("edit-photo").hidden = !blob;
   $("auto-cutout").hidden = !blob || !draft?.id || draft.level !== 4;
+  $("draw-cutout").hidden = $("auto-cutout").hidden;
   $("remove-photo").hidden = !blob && !(draft?.hasPhoto && !draft.photoRemoved);
   if (previewUrl) $("preview").src = previewUrl;
   else $("preview").removeAttribute("src");

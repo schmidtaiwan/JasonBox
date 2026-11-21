@@ -56,7 +56,7 @@ function distinctMasks(candidates, limit) {
   return selected.map(({ mask }) => Uint8Array.from(mask));
 }
 
-self.onmessage = async ({ data: { type, key, pixels, width, height, x, y } }) => {
+self.onmessage = async ({ data: { type, key, pixels, width, height, x, y, points } }) => {
   try {
     const [model, processor] = await loadCutoutTools();
     if (type === "preload") return;
@@ -66,15 +66,12 @@ self.onmessage = async ({ data: { type, key, pixels, width, height, x, y } }) =>
       prepared = { key, width, height, inputs, embeddings: await model.get_image_embeddings(inputs) };
     }
     const stride = width * height;
-    if (type === "automatic") {
+    if (type === "selected") {
       const candidates = [];
-      const grid = [.12, .31, .5, .69, .88];
-      for (const y of grid) {
-        for (const x of grid) {
-          const masks = await masksAt(model, processor, width, height, x, y);
-          const candidate = masks.find(({ score, area }) => score >= .75 && area >= stride * .004 && area <= stride * .5);
-          if (candidate) candidates.push(candidate);
-        }
+      for (const { x, y } of points) {
+        const masks = await masksAt(model, processor, width, height, x, y);
+        const candidate = masks.find(({ area }) => area >= 4 && area <= stride * .95);
+        if (candidate) candidates.push(candidate);
       }
       const masks = distinctMasks(candidates, 12);
       self.postMessage({ masks }, masks.map(mask => mask.buffer));

@@ -65,7 +65,7 @@ function sendCutoutRequest(key, pixels, width, height, options) {
       cutoutWorker = undefined;
       reject(new Error("無法載入輪廓擷取模型，請稍後再試。"));
     };
-    const timeout = setTimeout(fail, options.type === "automatic" ? 240000 : 120000);
+    const timeout = setTimeout(fail, options.type === "selected" ? 240000 : 120000);
     worker.onerror = fail;
     worker.onmessage = ({ data }) => {
       if (data.error) return fail();
@@ -105,10 +105,10 @@ async function makeObjectCutout(image, point, key) {
   return encodeCutout(source, mask);
 }
 
-async function makeAutomaticCutouts(image, key) {
+async function makeSelectedCutouts(image, key, points) {
   const source = cutoutSource(image, 640);
   const original = source.pixels.data.slice();
-  const { masks } = await detectCutout(key, original.slice(), source.width, source.height, { type: "automatic" });
+  const { masks } = await detectCutout(key, original.slice(), source.width, source.height, { type: "selected", points });
   const photos = [];
   for (const mask of masks) {
     source.pixels.data.set(original);

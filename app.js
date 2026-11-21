@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 85;
+const PAGE_BUILD = 86;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -1086,9 +1086,11 @@ async function touchParent(id) {
 let autoCutoutVersion = 0;
 let autoCutoutPhotos = [];
 let autoCutoutUrls = [];
+let cutoutPoints = [];
 
 function resetAutomaticCutouts() {
   autoCutoutVersion++;
+  stopCutoutSelection();
   for (const url of autoCutoutUrls) URL.revokeObjectURL(url);
   autoCutoutUrls = [];
   autoCutoutPhotos = [];
@@ -1099,9 +1101,57 @@ function resetAutomaticCutouts() {
   $("auto-cutout").disabled = false;
 }
 
-$("auto-cutout").onclick = async () => {
+function stopCutoutSelection() {
+  cutoutPoints = [];
+  $("cutout-selection").hidden = true;
+  $("cutout-points").hidden = true;
+  $("cutout-points").setAttribute("hidden", "");
+  $("cutout-points").replaceChildren();
+  $("preview").classList.remove("selecting-cutouts");
+}
+
+function renderCutoutPoints() {
+  const image = $("preview");
+  const overlay = $("cutout-points");
+  const { naturalWidth: width, naturalHeight: height } = image;
+  overlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const radius = Math.max(width, height) * .014;
+  overlay.replaceChildren(...cutoutPoints.map(({ x, y }) => svgNode("circle", { cx: x * width, cy: y * height, r: radius })));
+  $("confirm-cutout").disabled = !cutoutPoints.length;
+  $("undo-cutout-point").disabled = !cutoutPoints.length;
+  $("auto-cutout-status").textContent = cutoutPoints.length + "／12 個選點。請點選照片中的物品後按確認辨識。";
+}
+
+$("preview").onclick = event => {
+  if ($("cutout-selection").hidden || cutoutPoints.length >= 12) return;
+  const point = photoTapPoint($("preview"), event.clientX, event.clientY);
+  if (!point) return;
+  cutoutPoints.push(point);
+  renderCutoutPoints();
+};
+
+$("undo-cutout-point").onclick = () => {
+  cutoutPoints.pop();
+  renderCutoutPoints();
+};
+$("cancel-cutout").onclick = resetAutomaticCutouts;
+
+$("auto-cutout").onclick = () => {
   if (!draft?.id || draft.level !== 4 || !previewUrl || $("auto-cutout").disabled) return;
   resetAutomaticCutouts();
+  $("auto-cutout").disabled = true;
+  $("cutout-selection").hidden = false;
+  $("cutout-points").hidden = false;
+  $("cutout-points").removeAttribute("hidden");
+  $("preview").classList.add("selecting-cutouts");
+  $("auto-cutout-status").hidden = false;
+  renderCutoutPoints();
+};
+
+$("confirm-cutout").onclick = async () => {
+  if ($("cutout-selection").hidden || !cutoutPoints.length) return;
+  const points = cutoutPoints;
+  stopCutoutSelection();
   const version = autoCutoutVersion;
   const status = $("auto-cutout-status");
   const image = $("preview");
@@ -1111,7 +1161,7 @@ $("auto-cutout").onclick = async () => {
   try {
     await image.decode();
     if (version !== autoCutoutVersion) return;
-    const photos = await makeAutomaticCutouts(image, image.src);
+    const photos = await makeSelectedCutouts(image, image.src, points);
     if (version !== autoCutoutVersion) return;
     const grid = $("auto-cutout-grid");
     const save = $("save-cutouts");

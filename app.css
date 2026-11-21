@@ -263,3 +263,6 @@ footer { z-index: 20; }
 #preview.drawing-cutouts { touch-action: none; }
 #cutout-points polygon, #cutout-points polyline { fill: #244d3840; stroke: white; stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
 #cutout-points polyline { fill: none; }
+
+.named-cutout { display: flex; align-items: center; gap: 8px; width: 100%; }
+.named-cutout input[type="text"] { flex: 1; min-width: 0; }

@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 89;
+const PAGE_BUILD = 90;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -1299,8 +1299,22 @@ $("confirm-cutout").onclick = async () => {
       preview.src = URL.createObjectURL(photo);
       autoCutoutUrls.push(preview.src);
       label.append(checkbox, preview);
-      grid.append(label);
-      return { photo, checkbox };
+      if (!draw) {
+        grid.append(label);
+        return { photo, checkbox };
+      }
+      const row = element("div", "", "named-cutout");
+      const nameInput = element("input", "");
+      nameInput.type = "text";
+      nameInput.maxLength = 80;
+      nameInput.placeholder = "物品名稱";
+      nameInput.setAttribute("aria-label", "第 " + (index + 1) + " 張照片的物品名稱");
+      nameInput.onkeydown = event => {
+        if (event.key === "Enter" && !event.isComposing) event.preventDefault();
+      };
+      row.append(label, nameInput);
+      grid.append(row);
+      return { photo, checkbox, nameInput };
     });
     save.disabled = !photos.length;
     $("auto-cutout-results").hidden = !photos.length;
@@ -1322,8 +1336,9 @@ $("save-cutouts").onclick = () => {
   if (!selected.length) return;
   const parent = draft.parent;
   const name = "物品照片 " + formatTime(new Date().toISOString());
-  for (const [index, { photo }] of selected.entries()) {
-    queuePhotoUpload({ level: 4, parent, name: name + " " + (index + 1), photo });
+  for (const [index, { photo, nameInput }] of selected.entries()) {
+    const itemName = nameInput?.value.trim() || name + " " + (index + 1);
+    queuePhotoUpload({ level: 4, parent, name: itemName, photo });
   }
 };
 

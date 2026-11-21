@@ -538,6 +538,16 @@ test('map placement, direct items, timestamps, reopening and deleting update sto
   finishDetails(storedEntries);
   await signingIn;
   assert.equal(run('floorSnapshotOnly'), false);
+  const photoCount = run(`(() => {
+    const original = entries;
+    const mode = displayMode;
+    const cabinet = { id: 'shoes', name: '鞋櫃', level: 1, hasPhoto: true };
+    entries = ['left', 'middle', 'right'].map(id => ({ id, parent: cabinet.id, level: 2, hasPhoto: true }));
+    displayMode = 'details';
+    try { return card(cabinet, false).children[0].children[1].children[1].textContent; }
+    finally { entries = original; displayMode = mode; }
+  })()`);
+  assert.equal(photoCount, '0 件物品 · 3 個空間 · 3 張照片');
   assert.equal(run('current.name'), '2F', 'detail loading preserves the floor selected from the snapshot');
   assert.ok(run('entries.some(entry => entry.level === 4)'));
   const floorId = records.find(record => record.name === '2F').id;

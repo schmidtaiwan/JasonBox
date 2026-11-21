@@ -1,7 +1,7 @@
 "use strict";
 
 const labels = ["樓層", "空間", "櫃子", "分類箱", "物品"];
-const PAGE_BUILD = 76;
+const PAGE_BUILD = 77;
 const PAGE_DATE = "2026-11-21";
 const markerSizes = { small: .8, normal: 1, large: 1.25, xlarge: 1.5 };
 const markerSettingsKey = "jasonbox-marker-settings";
@@ -302,6 +302,17 @@ function changeDescription(entry) {
   return formatTime(entry.updatedAt) + " · " + account;
 }
 
+function containedPhotoCount(space, children) {
+  let count = space.albumPhotoCount || 0;
+  for (const child of children) {
+    if (child.hasPhoto) count++;
+    if (child.level < 4) {
+      count += containedPhotoCount(child, entries.filter(entry => entry.parent === child.id));
+    }
+  }
+  return count;
+}
+
 function card(entry, searching) {
   if (displayMode === "list") return photoListCard(entry);
   const row = element("div", "", "card");
@@ -314,7 +325,7 @@ function card(entry, searching) {
   if (searching && path) description.append(element("small", path));
   else if (!isItem && !floorSnapshotOnly) {
     const items = children.filter(child => child.level === 4);
-    const photoCount = Number(Boolean(entry.hasPhoto)) + (entry.albumPhotoCount || 0) + items.filter(item => item.hasPhoto).length;
+    const photoCount = containedPhotoCount(entry, children);
     description.append(element("small", items.length + " 件物品 · " + (children.length - items.length) + " 個空間 · " + photoCount + " 張照片"));
   }
   const thumb = element("span", entry.positionType || labels[entry.level], "thumb");
